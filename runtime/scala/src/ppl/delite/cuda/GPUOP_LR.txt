@@ -1,0 +1,5 @@
+ppl.delite.dsl.optiml.Vector$OP_mapLR
+ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_diag_single
+ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_mult_single
+//ppl.delite.dsl.optiml.Matrix$OP_inv
+//ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_vmult_single

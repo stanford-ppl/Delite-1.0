@@ -1,0 +1,21 @@
+#!/bin/bash
+
+echo this script should not be used anymore, because the individual classes
+echo have been customized from the template
+exit
+
+#for t in Int Short Float Long Char Byte
+#for t in Int Short Float Long
+for t in skip
+do
+	sed "s/$t/${t}2/g" DeliteDouble.scala > Delite${t}.scala2
+	sed "s/Double/$t/g" Delite${t}.scala2 > Delite${t}.scala3
+	sed "s/${t}2/Double/g" Delite${t}.scala3 > Delite${t}.scala
+	rm Delite${t}.scala2
+	rm Delite${t}.scala3
+
+	#lower=`echo "$t" | tr '[A-Z]' '[a-z]'`
+	#sed "s/double/$lower/g" Array${t}Vector.scala > _tmp
+	#mv _tmp Array${t}Vector.scala
+done
+

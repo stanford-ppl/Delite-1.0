@@ -1,0 +1,13 @@
+<atlassian-ide-plugin>
+  <project-configuration>
+    <servers>
+      <jira>
+        <server-id>461ff75a-dfa1-4586-a454-920821736a7e</server-id>
+        <name>arsenalfc</name>
+        <url>http://arsenalfc.stanford.edu:8085</url>
+        <dontUseBasicAuth>true</dontUseBasicAuth>
+      </jira>
+    </servers>
+    <default-jira-server>461ff75a-dfa1-4586-a454-920821736a7e</default-jira-server>
+  </project-configuration>
+</atlassian-ide-plugin>

@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# This is a wrapper that sets up the bootclasspath and classpath
+# for executing Scala programs in Delite.
+
+DELITE_BASE=`dirname $0`/..
+HOSTNAME=`hostname`
+#DELITE_CLASSES=$DELITE_BASE/runtime/scala/classes
+DELITE_CLASSES=$DELITE_BASE/runtime/out/production/
+BOOTSTRAP=$DELITE_BASE/runtime/bootstrap
+DELITE_SRCS=$DELITE_BASE/runtime/scala/src/
+SCALA_PLUGINS=$DELITE_BASE/plugins/jars/
+PROPS=$DELITE_BASE/config/$HOSTNAME.properties
+EXT_LIBS=$DELITE_BASE/ext_libs
+
+JAVA_HOME=`awk -F= '$1=="jdk.home" {print $2}' $PROPS`
+SCALA_HOME=`awk -F= '$1=="scala.home" {print $2}' $PROPS`
+
+if [ ! -f "$PROPS" -o "x$JAVA_HOME" = "x" -o "x$SCALA_HOME" = "x" ]; then
+  echo "Unable to load jdk.home and scala.home from properties file $PROPS" 1>&2
+  exit 1
+fi
+
+JAVACMD=$JAVA_HOME/bin/java
+#JAVA_OPTS="$JAVA_OPTS -d64 -Xmx8192M -server -Xbootclasspath/p:$DELITE_BASE/agent/classes"
+JAVA_OPTS="$JAVA_OPTS -Xmx1024M -Xbootclasspath/p:$DELITE_CLASSES/agent -DenableDebugOptions=true -DbypassExecutor=true"
+
+if [ "x$1" = "x--oprofile" ]; then
+  shift
+  export LD_LIBRARY_PATH="/usr/local/lib/oprofile:$LD_LIBRARY_PATH"
+  JAVA_OPTS="$JAVA_OPTS -agentlib:jvmti_oprofile=debug"
+fi
+
+export JAVA_HOME JAVACMD JAVA_OPTS DELITE_BASE
+
+exec $SCALA_HOME/bin/scalac -Xplugin:$SCALA_PLUGINS/closuredep.jar -cp $EXT_LIBS/jsr166y.jar:$EXT_LIBS/ScalaCheck-1.5.jar:$EXT_LIBS/log4j-1.2.15.jar:$EXT_LIBS/junit-4.8.1.jar:$EXT_LIBS/scalatest-1.0.1-for-scala-2.8.0.Beta1-SNAPSHOT.jar:$BOOTSTRAP/scala "$@" 

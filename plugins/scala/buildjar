@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [ -z "$1" ]
+then
+  echo "Usage: buildjar <plugin name>"
+  exit
+fi
+
+PLUGIN_NAME=$1
+PLUGIN_HOME="src/ppl/delite/plugins/$PLUGIN_NAME"
+DELITE_SRC="../../runtime/scala/src"
+
+if [ ! -d "$PLUGIN_HOME" ]
+then
+  echo "error: plugin directory $PLUGIN_HOME does not exist"
+  exit
+fi  
+
+# clean up old plugin so we don't have to worry about bootstrap problems
+rm ../jars/$PLUGIN_NAME.jar
+
+rm -rf classes
+mkdir classes
+fsc -d classes $PLUGIN_HOME/*.scala
+#../../bin/dscalac -d classes $DELITE_SRC/ppl/delite/core/DeliteDSLType.scala
+cp $PLUGIN_HOME/scalac-plugin.xml classes
+pushd .
+cd classes
+jar cf ../../jars/$PLUGIN_NAME.jar .
+popd

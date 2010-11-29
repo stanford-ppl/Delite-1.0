@@ -1,0 +1,42 @@
+// Implicit bugs 
+- implicit conversion fails in the d_div (double_div) function call in RepDoubleOps 
+
+// Bigger Issues
+- Dealing with type erasure that results from using Rep, this impacts things like function overloading 
+  * use implicits to fix this for now
+- Dealing with calls to library functions and basically any function that is not lifted
+  * proposal is to implicitly lift function calls by replacing the call to the function by a function call node in the AST. 
+    Maybe would need to automatically replace T by Rep[T] in both parameters in return types of the called functions/
+
+// Bugs and enhancements in OptiML code, Arvind needs to fix these
+- Move MLInputReader to the OptiML DSL
+- Should we shift to using the infix methods that Tiark added
+- Start filling in the rest of the missing code gen pieces
+ 
+
+// TODOs 
+- need to lift the control structures
+  * for are lifted via foreach
+  * if/else still needs to be lifted
+  * assignements need to be lifted
+  * new variable creation need to be lifted
+
+- need to do code generation, Here are the notes from Arvind's discussion:
+
+-finish building AST for embedding of GDA
+  - add support for IF/ELSE
+  - clean up the format of the DSL AST
+    - add support for edges in the AST
+    - discuss how you can have a common AST that can get extended and still have generic optimization passes work on the AST
+    - getting common embeddings of Scala
+      - we do it lazily, scala guys do it eagerly
+
+-want to get to code gen on OptiML
+  - start with GDA AST to Scala
+  - add all apps we have 
+  - finishing building AST nodes for other application
+  - add DBN app with OptiML additions
+
+-in parallel, analysis framework
+
+-in parallel, generate Delite execution Graph and framework for parallel DSLs

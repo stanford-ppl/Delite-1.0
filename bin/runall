@@ -1,0 +1,218 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use Cwd;
+use File::Copy;
+use File::Spec::Functions;
+use Getopt::Long;
+
+my ($appc, %apps, $optc, %opts);
+my ($javaopt, %selected, $selectop);
+my ($DH, $SH, $JH, $JP, $XL, $ML, $CP, @JO);
+my ($doclean, $verbose, $prevopt, $allopts, $thisopt) = (0, 0, -1, 0, -1);
+
+#cops: -delite, -scala, -java, -javaopt, -select, -verbose, -prevopt, -thisopt
+my $go = GetOptions("delite=s"  => \$DH,       "scala=s"   => \$SH,
+                    "java=s"    => \$JH,       "javaopt=s" => \$javaopt,
+                    "prevopt=i" => \$prevopt,  "thisopt=i" => \$thisopt,
+                    "select=s"  => \$selectop, "doclean"   => \$doclean,
+                    "verbose"   => \$verbose);
+
+initialize();
+runall();
+exit;
+
+# ----------------------------------------------------------------------
+
+sub initialize {
+  unless ( defined $DH) {
+    if (exists $ENV{DELITE_HOME}) { $DH = "$ENV{DELITE_HOME}"; }
+    else { $DH = getcwd(); }
+  }
+  my ($jhome, $shome) = ("", "");
+  open my $bpr, '<', catfile(${DH}, 'build.properties') or die "Can't read old file: $!";
+  while ( <$bpr> ) {
+    if (/jdk\.home=(\S*)/)   { $jhome = $1; }
+    if (/scala\.home=(\S*)/) { $shome = $1; }
+  }
+  unless (defined $SH) {
+    if (exists $ENV{SCALA_HOME}) { $SH = "$ENV{SCALA_HOME}"; }
+    else { $SH = $shome; }
+  }
+  unless (defined $JH) {
+    if (exists $ENV{JAVA_HOME}) { $JH = "$ENV{JAVA_HOME}"; }
+    else { $JH = $jhome; }
+  }
+  $JP = catfile("${JH}", 'bin', 'java');
+  $XL = catfile("${DH}", 'scala', 'ext_libs');
+  $ML = catfile("${DH}", 'scala', 'src', 'ppl', 'ml', 'apps');
+  $CP = join(':',
+             catfile(${SH}, 'lib', 'scala-library.jar'),
+             catfile(${SH}, 'lib', 'scala-compiler.jar'),
+             catfile(${XL}, 'jsr166y.jar'),
+             catfile(${XL}, 'ScalaCheck-1.5.jar'),
+             catfile(${XL}, 'log4j-1.2.15.jar'),
+             catfile(${DH}, 'scala', 'classes'));
+  if (defined $javaopt) { @JO = split(/\s/, $javaopt);
+  } else { @JO = ("-Xmx1024M", "-cp", "${CP}"); }
+  if (defined $selectop) {
+    for my $app (split(/\s/, $selectop)) { $selected{$app} = 1; }
+  }
+  $allopts = 1 unless $thisopt > -1;
+  $appc = catfile("${DH}", 'bin', 'config');
+  %apps = loadapps($appc);
+  $optc = catfile("${DH}", 'scala', 'src', 'ppl', 'delite', 'config.scala');
+  %opts = loadopts($optc);
+}
+
+sub loadapps {
+  my $cfg = shift( @_ );
+  my %apps;
+  my $num = 1;
+  open my $inf, '<', $cfg or die "Can't read old file: $!";
+  while ( <$inf> ) {
+    my ($key, $name, $args) = split(/\s+/, $_, 3);
+    my @arr = ($name);
+    foreach my $arg (split(/\s+/, $args)) {
+      my @lst = split(/\//, $arg);
+      for (@lst) {
+        s/\%p/${ML}/;
+      }
+      @arr = (@arr, catfile(@lst));
+    }
+    $apps{$key} = [@arr];
+  }
+  close $inf;
+  return %apps;
+}
+
+sub loadopts {
+  my $cfg = shift( @_ );
+  my %opts;
+  my $num = 1;
+  open my $inf, '<', $cfg or die "Can't read old file: $!";
+  while ( <$inf> ) {
+    if (/val\s+([^\s=]+)\s*=/) {
+        $opts{$1} = $num;
+        $num = $num << 1;
+    }
+  }
+  close $inf;
+  return %opts;
+}
+
+sub reconf {
+  my $cfg = shift( @_ );
+  my $bit = shift( @_ );
+  my $num = 1;
+  my $tmp;
+  open my $inf, '<', $cfg or die "Can't read old file: $!";
+  open my $ouf, '>', "${cfg}.tmp" or die "Can't write new file: $!";
+  while ( <$inf> ) {
+    my $line = $_;
+    if (/(false)|(true)/) {
+      if ($bit & $num) {
+        $line =~ s/\b(false)\b/true/g;
+      } else {
+        $line =~ s/\b(true)\b/false/g;
+      }
+      $num = $num << 1;
+    }
+    print $ouf $line;
+  }
+  close $ouf;
+  close $inf;
+  move("${cfg}.tmp", "${cfg}");
+  my $optstr = getcfg($cfg);
+  if ($doclean) {
+    print "  cleaning;\n" if $verbose;
+    $tmp = `ant clean`;
+    print "$tmp" if $verbose;
+  }
+  print "  config: $bit $optstr;\n" if $verbose;
+  $tmp = `ant`;
+  print "$tmp" if $verbose;
+}
+
+sub getcfg {
+  my $cfg = shift( @_ );
+  my $cfgstr = "";
+  open my $inf, '<', $cfg or die "Can't read file: $!";
+  while ( <$inf> ) {
+    if (/([^\s=]+)\s*=\s*true/) {
+      $cfgstr = "$cfgstr.$1";
+    }
+  }
+  close $inf;
+  $cfgstr = ".none" unless $cfgstr;
+  return $cfgstr;
+}
+
+sub getops {
+  my $cfg = shift( @_ );
+  my $cfgstr = ".";
+  open my $inf, '<', $cfg or die "Can't read file: $!";
+  while ( <$inf> ) {
+    if (/([^\s=]+)\s*=\s*true/) {
+      my $l = substr($1,0,1);
+      $cfgstr = "${cfgstr}${l}";
+    } elsif (/([^\s=]+)\s*=\s*false/) {
+      $cfgstr = "${cfgstr}-";
+    }
+  }
+  close $inf;
+  return $cfgstr;
+}
+
+sub runapp {
+  my @args = @_;
+  my $psrc = catfile("${DH}", 'scala', 'src',     'log4j.properties');
+  my $pdst = catfile("${DH}", 'scala', 'classes', 'log4j.properties');
+  copy( $psrc, $pdst) or die "Copy failed: $!";
+  print "    ${JP} @JO @args\n" if $verbose;
+  print `${JP} @JO @args`;
+}
+
+sub runopt {
+    my $thisopt = shift( @_ );
+    reconf($optc, $thisopt) unless $prevopt == $thisopt;
+    my $optstr = getops($optc);
+    foreach my $app (keys (%apps)) {
+      if (exists $selected{$app}) {
+        runapp(@{ $apps{$app} });
+        my ($s,$m,$h,$d,$o,$y,$w,$a,$i) = localtime();
+        $y += 1900;   $o += 1; $o = "0$o" if $o < 10;
+        $d = "0$d" if $d < 10; $h = "0$h" if $h < 10;
+        $m = "0$m" if $m < 10; $s = "0$s" if $s < 10;
+        my $stats = "stats.${app}${optstr}.$y$o$d$h$m$s.plt";
+        my $etdag = "etdag.${app}${optstr}.$y$o$d$h$m$s.dot";
+        my $trace = "trace.${app}${optstr}.$y$o$d$h$m$s.dat";
+        my $times = "times.${app}${optstr}.$y$o$d$h$m$s.tmg";
+        print "    stats are saved in $stats;\n" if $verbose;
+        move("delite-stats.plt", "$stats") or die "File rename failed: $!";
+        print "    plots are saved in $etdag;\n" if $verbose;
+        move("etdag.dot", "$etdag") or die "File rename failed: $!";
+        print "    trace  is saved in $trace;\n" if $verbose;
+        move("delite.trc", "$trace") or die "File rename failed: $!";
+        print "    ----------------------------------------------------\n" if $verbose;
+      }
+    }
+}
+
+sub runall {
+  my $num = (1 << keys (%opts)) - 1;
+  print "tests begin...\n";
+  if ($verbose) {
+    print "  applications:";
+    for my $app (keys(%selected)) { print " $app"; }
+    print ";\n";
+  }
+  if ($allopts) {
+    for my $it (0..$num) { runopt($it); }
+  } else { runopt($thisopt); }
+  print "tests ended.\n";
+}
+
+# ----------------------------------------------------------------------

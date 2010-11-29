@@ -1,0 +1,6 @@
+Kmeans      ppl.ml.apps.kmeans.kmeansdemo
+GDA         ppl.ml.apps.gda.GDA       %p/gda/q1x.dat         %p/gda/q1y.dat
+LinReg      ppl.ml.apps.linreg.LinReg %p/linreg/q2x.dat      %p/linreg/q2y.dat
+NaiveBayes  ppl.ml.apps.nb.NaiveBayes %p/nb/MATRIX.TRAIN.50  %p/nb/MATRIX.TEST
+SVM_Train   ppl.ml.apps.svm.SVM train %p/svm/MATRIX.TRAIN.50 %p/svm/model.dat
+SVM_test    ppl.ml.apps.svm.SVM test  %p/svm/MATRIX.TEST     %p/svm/model.dat

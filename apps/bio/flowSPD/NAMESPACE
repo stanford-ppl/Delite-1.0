@@ -1,0 +1,10 @@
+useDynLib(flowSPD)
+export(
+    "FlowSPD.density",
+    "FlowSPD.addDensityToFCS",
+    "FlowSPD.downsampleFCS",
+    "FlowSPD.cluster",
+    "FlowSPD.FCSToTree",
+    "FlowSPD.assignToCluster",
+    "FlowSPD.addClusterToFCS"
+)

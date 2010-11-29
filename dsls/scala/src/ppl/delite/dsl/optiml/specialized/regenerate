@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# arith
+for t in Int Float Long
+do
+  sed "s/Double/$t/g" DoubleVector.scala > ${t}Vector.scala
+  sed "s/Double/$t/g" DoubleMatrix.scala > ${t}Matrix.scala
+
+	lower=`echo "$t" | tr '[A-Z]' '[a-z]'`
+	sed "s/double/$lower/g" ${t}Vector.scala > _tmp
+	mv _tmp ${t}Vector.scala
+	sed "s/double/$lower/g" ${t}Matrix.scala > _tmp
+	mv _tmp ${t}Matrix.scala
+done
+
+# native (disable native calls for types other than Double and Float)
+for t in Int Long
+do
+  perl -e 'local $/; $_ = <>; s/if\(Config.useNativeLibs\).*\n*.*\n*.*else//g; print' ${t}Matrix.scala > _tmp
+  mv _tmp ${t}Matrix.scala
+  perl -e 'local $/; $_ = <>; s/DeliteNative/throw new UnsupportedOperationException\n\/\/DeliteNative/g; print' ${t}Matrix.scala > _tmp
+  mv _tmp ${t}Matrix.scala
+
+  perl -e 'local $/; $_ = <>; s/if\(Config.useNativeLibs\).*\n*.*\n*.*else//g; print' ${t}Vector.scala > _tmp
+  mv _tmp ${t}Vector.scala
+  perl -e 'local $/; $_ = <>; s/DeliteNative/throw new UnsupportedOperationException\n\/\/DeliteNative/g; print' ${t}Vector.scala > _tmp
+  mv _tmp ${t}Vector.scala
+done
+
+# gpu (disable gpu kernel functions for types other than Double and Float)
+for t in Int Long
+do
+	sed "s/override def getGPUKernelId/*\/\/\/override def getGPUKernelId/g" ${t}Vector.scala > _tmp
+	mv _tmp ${t}Vector.scala
+	sed "s/override def getGPUInputs/\/*override def getGPUInputs/g" ${t}Vector.scala > _tmp
+	mv _tmp ${t}Vector.scala
+	sed "s/override def getGPUKernelId/*\/\/\/override def getGPUKernelId\/\//g" ${t}Matrix.scala > _tmp
+	mv _tmp ${t}Matrix.scala
+	sed "s/override def getGPUInputs/\/*override def getGPUInputs/g" ${t}Matrix.scala > _tmp
+	mv _tmp ${t}Matrix.scala
+done
+
+# other
+for t in Boolean Int Float Long
+do
+	sed "s/Double/$t/g" DoubleVectorImpl.scala > ${t}VectorImpl.scala
+	sed "s/Double/$t/g" DoubleVectorViewImpl.scala > ${t}VectorViewImpl.scala
+	sed "s/Double/$t/g" DoubleMatrixImpl.scala > ${t}MatrixImpl.scala
+
+	lower=`echo "$t" | tr '[A-Z]' '[a-z]'`
+	sed "s/double/$lower/g" ${t}VectorImpl.scala > _tmp
+	mv _tmp ${t}VectorImpl.scala
+	sed "s/double/$lower/g" ${t}VectorViewImpl.scala > _tmp
+	mv _tmp ${t}VectorViewImpl.scala
+	sed "s/double/$lower/g" ${t}MatrixImpl.scala > _tmp
+	mv _tmp ${t}MatrixImpl.scala
+done
+
+# special case cleanups
+sed "s/import ppl.delite.dsl.primitive.{DeliteInt, DeliteInt}/import ppl.delite.dsl.primitive.DeliteInt/g" IntVector.scala > _tmp
+mv _tmp IntVector.scala

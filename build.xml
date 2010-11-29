@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="delite" default="all">
+
+    <!-- Directory that holds this ant file -->
+    <dirname property="basedir" file="${ant.file}"/>
+
+    <!-- Hopefully the system-specific stuff is in build.properties, not this file. -->
+    <exec executable="hostname" outputproperty="hostname"/>
+    <property name="config.filename" value="${hostname}.properties"/>
+    <property file="${basedir}/build.properties"/>
+
+    <!-- Paths -->
+    <property name="build.dir" value="${basedir}"/>
+	  <property name="native.lib.dir" value="${basedir}/cnative/lib"/> 
+	  <property name="native.src.dir" value="${basedir}/cnative/src/ppl/delite/cnative"/> 
+    <property name="module.agent.src.dir" value="${basedir}/agent/src"/>
+    <property name="module.agent.classes.dir" value="${build.dir}/agent/classes"/>
+    <property name="module.apps.src.dir" value="${basedir}/apps/scala/src"/>
+    <property name="module.apps.classes.dir" value="${build.dir}/apps/scala/classes"/>    
+    <property name="module.dsls.src.dir" value="${basedir}/dsls/scala/src"/>
+    <property name="module.metrics.src.dir" value="${basedir}/metrics/scala/src"/>
+    <property name="module.runtime.src.dir" value="${basedir}/runtime/scala/src"/>
+    <property name="module.runtime.classes.dir" value="${build.dir}/runtime/scala/classes"/>
+    <property name="module.runtime.cudadst.dir" value="/tmp/cuda"/>
+    <property name="module.runtime.cudasrc.dir" value="${basedir}/runtime/scala/src/ppl/delite/cuda"/>
+    
+    <!-- Global Libraries -->
+
+    <path id="lib.scala.classpath">
+        <pathelement location="${basedir}/ext_libs/scala-compiler.jar"/>
+        <pathelement location="${basedir}/ext_libs/scala-dbc.jar"/>
+        <pathelement location="${basedir}/ext_libs/scala-library.jar"/>
+        <pathelement location="${basedir}/ext_libs/scala-swing.jar"/>
+    </path>
+    <path id="lib.ext.classpath">
+        <pathelement location="${basedir}/ext_libs/jsr166y.jar"/>
+        <pathelement location="${basedir}/ext_libs/ScalaCheck-1.5.jar"/>
+        <pathelement location="${basedir}/ext_libs/log4j-1.2.15.jar"/>
+        <pathelement location="${basedir}/ext_libs/junit-4.8.1.jar"/>
+        <pathelement location="${basedir}/ext_libs/scalatest-1.2-for-scala-2.8.0.RC7-SNAPSHOT.jar"/>
+    </path>
+    <taskdef name="scalac" classname="scala.tools.ant.Scalac" classpathref="lib.scala.classpath"/>
+
+    <!-- Module Library Dependencies -->
+
+    <path id="module.agent.classpath"/>
+
+    <path id="module.apps.classpath">
+        <path refid="lib.scala.classpath"/>
+        <path refid="lib.ext.classpath"/>
+        <path location="${module.runtime.classes.dir}"/>        
+        <path location="${module.apps.classes.dir}"/>
+        <path location="${native.lib.dir}"/>
+    </path>
+
+    <path id="module.runtime.classpath">
+        <path refid="lib.scala.classpath"/>
+        <path refid="lib.ext.classpath"/>
+        <path location="${module.runtime.classes.dir}"/>
+        <path location="${native.lib.dir}"/>
+    </path>
+
+    <!-- JDK definitions -->
+
+    <property name="jdk.bin" value="${jdk.home}/bin"/>
+    <path id="jdk.classpath">
+        <fileset dir="${jdk.home}">
+            <include name="jre/lib/jce.jar"/>
+            <include name="jre/lib/management-agent.jar"/>
+            <include name="jre/lib/rt.jar"/>
+            <include name="jre/lib/charsets.jar"/>
+            <include name="jre/lib/resources.jar"/>
+            <include name="jre/lib/jsse.jar"/>
+            <include name="jre/lib/ext/sunjce_provider.jar"/>
+            <include name="jre/lib/ext/localedata.jar"/>
+            <include name="jre/lib/ext/dnsns.jar"/>
+            <include name="jre/lib/ext/sunpkcs11.jar"/>
+        </fileset>
+    </path>
+
+    <!-- Modules -->
+
+    <!-- The agent module contains a single Java file that should be in the
+         boot classpath of a JVM that uses the Delite stuff.  It provides a
+         way for the Scala code to get access to sun.misc.Unsafe without
+         requiring all of Scala and all of Delite to run from the boot
+         classpath. -->
+
+    <target name="compile.module.agent" description="Compile module agent">
+        <mkdir dir="${module.agent.classes.dir}"/>
+        <javac destdir="${module.agent.classes.dir}" debug="true" fork="true">
+            <classpath refid="module.agent.classpath"/>
+            <src path="${module.agent.src.dir}"/>
+        </javac>
+    </target>
+
+    <target name="clean.module.agent" description="cleanup module agent">
+        <delete dir="${module.agent.classes.dir}"/>
+    </target>
+
+    <!-- Module apps -->
+    <target name="compile.module.apps" description="Compile module apps">
+        <mkdir dir="${module.apps.classes.dir}"/>
+        <scalac destdir="${module.apps.classes.dir}" logging="none"
+                addparams="-Xplugin:${basedir}/plugins/jars/closuredep.jar">
+            <classpath refid="module.apps.classpath"/>
+            <src path="${module.apps.src.dir}"/>
+        </scalac>
+        <javac destdir="${module.apps.classes.dir}">
+            <classpath refid="module.apps.classpath"/>
+            <src path="${module.apps.src.dir}"/>
+        </javac>
+    </target>
+
+    <target name="clean.module.apps" description="cleanup module apps">
+        <delete dir="${module.apps.classes.dir}"/>
+    </target>
+
+	<!-- Native library compile for module.runtime -->
+	<condition property="machine.niagara">
+		<contains string="${hostname}" substring="niagara"/>
+	</condition>
+	
+	<condition property="machine.tflop">
+		<contains string="${hostname}" substring="tflop"/>
+	</condition>
+	
+	<target name="native.niagara" if="machine.niagara">
+		<echo message="Compiling native library for niagara"/>
+        	<mkdir dir="${native.lib.dir}"/>
+        	<exec executable="cc">
+            		<arg line="-I${jdk.home}/include -I${jdk.home}/include/solaris -L/opt/SUNWspro/lib/v9 -R/opt/SUNWspro/lib/v9 -lsunperf -fPIC -m64 -o ${native.lib.dir}/libDeliteDriver.so -shared ${native.src.dir}/nativeLib_niagara.c"/>
+        	</exec>
+	</target>
+	
+	<target name="native.tflop" if="machine.tflop">
+		<echo message="Compiling native library for tflop"/>
+        	<mkdir dir="${native.lib.dir}"/>
+        <exec executable="/usr/local/intel/bin/intel64/icc" output="nativeout.txt" error="nativeerr.txt">
+            <arg line="-O3 -opt_report -I${jdk.home}/include -I${jdk.home}/include/linux -I/usr/local/intel/mkl/include -L/usr/local/intel/mkl/lib/em64t -L/usr/local/intel/lib/intel64 -lgsl -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lmkl_mc3 -lmkl_def -lgfortran -fPIC -o ${native.lib.dir}/libDeliteDriver.so -shared ${native.src.dir}/nativeLib.c"/>
+        </exec>
+		<!--
+		<exec executable="gcc">
+            <arg line="-I${jdk.home}/include -I${jdk.home}/include/linux -L/usr/local/lib/GotoBLAS2 -lgsl -lgoto2 -lgfortran -lm -fPIC -o ${native.lib.dir}/libDeliteDriver.so -shared ${native.src.dir}/nativeLib.c"/>
+        </exec>
+		-->
+	</target>
+    
+	<!-- Module runtime -->
+    <target name="compile.module.runtime" description="Compile module runtime">
+        <mkdir dir="${module.runtime.classes.dir}"/>
+        <mkdir dir="${native.lib.dir}"/>
+	<scalac destdir="${module.runtime.classes.dir}" logging="none">
+            <classpath refid="module.runtime.classpath"/>
+            <src path="${module.runtime.src.dir}"/>
+            <src path="${native.src.dir}"/>
+            <src path="${module.dsls.src.dir}"/>
+            <src path="${module.metrics.src.dir}"/>
+            <src path="${module.agent.src.dir}"/>
+        </scalac>
+        <javac destdir="${module.runtime.classes.dir}">
+            <classpath refid="module.runtime.classpath"/>
+            <src path="${module.runtime.src.dir}"/>
+          </javac>
+     	<!-- Compile native library related java code-->
+		<javac destdir="${native.lib.dir}">
+			<classpath refid="module.runtime.classpath"/>
+			<src path="${native.src.dir}"/>
+		</javac>
+        <javah classpath="${native.lib.dir}" destdir="${native.src.dir}">
+            <class name="ppl.delite.cnative.DeliteNative"/>
+        </javah>
+		<!-- End of native library java compile -->
+    </target>
+
+    <target name="clean.module.runtime" description="cleanup module runtime">
+        <delete dir="${module.runtime.classes.dir}"/>
+        <delete dir="${module.dsls.classes.dir}"/>
+        <delete dir="${module.metrics.classes.dir}"/>
+        <delete dir="${native.lib.dir}"/>
+    </target>
+
+
+
+    <!-- Compilation for CUDA 
+      Destination directory of nvcc output files is /tmp/cuda. (linux based)
+      This directory is hard-coded in the source files  ...../cuda/{cudaInit.cu, DeliteCuda.scala}  -->
+    <target name="compile.module.cuda" description="Compile module cuda">
+        <mkdir dir="${module.runtime.cudadst.dir}"/>
+        <javah classpath="${module.runtime.classes.dir}" destdir="${module.runtime.cudasrc.dir}">
+            <class name="ppl.delite.cuda.DeliteCudaDriver"/>
+        </javah>
+
+        <exec executable="nvcc">
+            <arg line="-arch compute_13 -code sm_13 -odir ${module.runtime.cudadst.dir} -ptx ${module.runtime.cudasrc.dir}/cudaKernels.cu"/>
+        </exec>
+
+        <!-- ${jdk.home}/include directory contains jni.h (jni_md.h is in ${jdk.home}/include/linux for linux system)
+         Make sure those files are properly included in the below compilation argument based on the system  -->
+        <exec executable="nvcc">
+            <arg line="-I${jdk.home}/include -I${jdk.home}/include/linux -lcuda -Xcompiler '-fPIC' -o ${module.runtime.cudadst.dir}/libDeliteCudaDriver.so -shared -arch compute_13 -code sm_13 ${module.runtime.cudasrc.dir}/cudaInit.cu ${module.runtime.cudasrc.dir}/cudaMem.cu ${module.runtime.cudasrc.dir}/cudaBLAS.cu ${module.runtime.cudasrc.dir}/cudaSched.cu"/>
+        </exec>
+    </target>
+
+    <target name="clean.module.cuda" description="cleanup cuda runtime">
+        <delete dir="${module.runtime.cudadst.dir}"/>
+    </target>
+
+
+    <!-- all -->
+
+    <target name="init" description="Build initialization">
+        <!-- Perform any build initialization in this target -->
+    </target>
+
+    <target name="clean" depends="clean.module.agent, clean.module.apps, clean.module.runtime"
+            description="cleanup all"/>
+
+    <target name="apps" depends="compile.module.runtime, native.tflop, native.niagara, compile.module.apps" description="build apps"/>
+
+    <target name="runtime" depends="compile.module.agent, compile.module.runtime, native.tflop, native.niagara" description="build runtime"/>
+
+    <target name="all" depends="compile.module.agent, compile.module.runtime, native.tflop, native.niagara, compile.module.apps"
+            description="build all"/>
+
+    <target name="cuda" depends="compile.module.agent, compile.module.runtime, native.tflop, native.niagara, compile.module.cuda"
+            description="build all with cuda"/>
+
+    <target name="cuda-clean" depends="clean.module.cuda" description="clean up cuda"/>
+</project>

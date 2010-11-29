@@ -1,0 +1,102 @@
+function DrawTrees_TwoSample_CellFreqDiff(FlowSPD_output_filename,FlowSPD_output_upsample_filename,file_annot,markers_to_draw, files_ind)
+% files_ind, 2-element vector
+% nodes well represeted in files_ind(1) is more blue
+% nodes well represeted in files_ind(2) is more red
+
+close all;
+warning off
+mkdir('figs')
+
+loaded_result_file = FlowSPD_output_filename;
+load(FlowSPD_output_filename)
+if ~exist('template'), template = []; end
+downsampled_data = data;
+downsampled_assign = sample_group_assign;
+adj = sample_group_progression_tree;
+coeff = node_position;
+for i=1:size(adj,1),  node_size(i) = sum(local_density(downsampled_assign==i)); end
+load(FlowSPD_output_upsample_filename)
+all_assign = all_assign(files_ind);
+node_median = node_median(files_ind,:,:);
+file_annot = file_annot(files_ind);
+
+if exist('markers_to_draw') && ~isempty(markers_to_draw)
+    if isnumeric(markers_to_draw)
+        ind = markers_to_draw;
+    elseif iscell(markers_to_draw)
+        [C,IA,IB] = intersect(all_marker_names, markers_to_draw);
+        ind = sort(IA);
+    end
+else
+    ind = 1:size(downsampled_data,1);
+end
+
+node_freq = zeros(2,size(adj,2));
+for file_ind = 1:size(node_freq,1)
+    for node = 1:size(node_freq,2)
+        node_freq(file_ind,node) = sum(abs(all_assign{file_ind})==node);
+    end
+    node_freq(file_ind,:) = node_freq(file_ind,:)./sum(node_freq(file_ind,:));
+end
+% % option 1: percentage difference
+diff_freq = (node_freq(2,:) - node_freq(1,:))./max([node_freq(1,:); node_freq(2,:); 0.00000001*ones(1,size(node_freq,2))]);  % precentage of change
+% % option 2: log ratio (this appears to be too noisy)
+% diff_freq = log(node_freq(2,:)./node_freq(1,:));  % log ratio
+% diff_freq(isinf(diff_freq) & sign(diff_freq)==1)  = max(diff_freq(~isinf(diff_freq)));
+% diff_freq(isinf(diff_freq) & sign(diff_freq)==-1) = min(diff_freq(~isinf(diff_freq)));
+
+mkdir('figs\Figures_FreqDiffTrees\')
+h6 = figure(6);
+[coeff] = DrawTree_subfunc_drawtree(adj,coeff,node_size,['FreqDiff ', file_annot{1}, '(blue) vs ', file_annot{2}, '(red)'], diff_freq, [],template);
+print(h6,['figs\Figures_FreqDiffTrees\FreqDiff_',file_annot{1},'vs',file_annot{2},'.jpg'],'-djpeg')
+
+
+[cluster_median] = DrawTree_subfunc_get_node_median(downsampled_data, downsampled_assign); 
+% cluster_median = reshape(nanmean(node_median,1),size(node_median,2),size(node_median,3))';
+
+h7 = figure(7); h8 = figure(8);
+[nx,ny] = DrawTree_subfunc_get_subplot_grid(length(ind));
+for i=1:length(ind)
+    node_color = get_redblue2d(cluster_median(ind(i),:),diff_freq);
+    figure(7); subplot(nx,ny,i);
+    [coeff] = DrawTree_subfunc_drawtree_HybridTissueMarker(adj,coeff, node_size, all_marker_names{ind(i)}, node_color);
+    h8 = figure(8); 
+    [coeff] = DrawTree_subfunc_drawtree_HybridTissueMarker(adj,coeff, node_size, [all_marker_names{ind(i)}, ' - ', file_annot{1}, '(blue) vs ', file_annot{2}, '(red)'], node_color);
+    print(h8,['figs\Figures_FreqDiffTrees\',remove_bad_filename_letters(marker_names{ind(i)}),'_IntensityFreqDiff',file_annot{1},'vs',file_annot{2},'.jpg'],'-djpeg')
+end
+print(h7,['figs\Figures_FreqDiffTrees\all_markers_IntensityFreqDiff',file_annot{1},'vs',file_annot{2},'.jpg'],'-djpeg')
+
+return
+
+
+function node_color = get_redblue2d(node_intensity,diff_freq)
+redblue2d_colormap = flipud(lbmapv3(512,'RedBlue2D'));
+discrete_node_intensity = round((node_intensity-min(node_intensity))/(max(node_intensity)-min(node_intensity))*255)+1;
+node_color = zeros(length(node_intensity),3);
+for i=1:size(node_color,1)
+    node_color(i,:) = interp1([1,-1],redblue2d_colormap(discrete_node_intensity(i)*2-1:discrete_node_intensity(i)*2,:),diff_freq(i));
+    if sum(node_color(i,:)==1)==3
+        node_color(i,:) = [0.999, 0.999, 0.999];
+    end
+end
+return
+
+
+
+
+% redblue2d_colormap = flipud(lbmapv3(512,'RedBlue2D'));
+% figure(10); hold off; plot(0); hold on
+% for intensity=1:256
+%     for freq = -1:0.02:1
+%         coordinates = [freq, freq+0.02, freq+0.02, freq ;...
+%                        intensity, intensity, intensity+1, intensity+1];
+%         c = interp1([1,-1],redblue2d_colormap(intensity*2-1:intensity*2,:),freq);
+% %         if freq>=0
+% %             c = interp1([1,0],[redblue2d_colormap(intensity*2-1,:);1,1,1],freq);
+% %         else
+% %             c = interp1([1,0],[redblue2d_colormap(intensity*2,:);1,1,1],-freq);
+% %         end
+%         patch(coordinates(1,:),coordinates(2,:), c,'edgecolor',c)
+%     end
+% end
+% axis tight

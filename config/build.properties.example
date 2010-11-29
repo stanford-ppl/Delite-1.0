@@ -1,0 +1,7 @@
+# Copy this file to build.properties, and modify the following
+# to refer to the correct paths on the local machine.  They are
+# used by ant build.xml, and by the bin/dscala script.
+
+jdk.home=/home/nbronson/java/jdk1.7.0_b35_x64
+scala.home=/home/nbronson/scala/scala-2.7.7.final/
+scala-e.home=/home/hchafi/projects/scala/embeddings/build/pack/

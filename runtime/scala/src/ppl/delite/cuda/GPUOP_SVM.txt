@@ -1,0 +1,3 @@
+ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_vmult_single
+ppl.delite.dsl.optiml.specialized.DoubleVector$OPGPU_trans
+ppl.delite.dsl.optiml.specialized.DoubleVector$OPGPU_$times

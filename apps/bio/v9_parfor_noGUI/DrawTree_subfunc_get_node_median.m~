@@ -1,0 +1,14 @@
+function [cluster_median] = DrawTree_subfunc_get_node_median(data, idx)
+% for
+
+
+
+cluster_median = zeros(size(data,1),max(idx))+NaN;
+for i=1:max(idx)
+    ind = find(idx==i);
+    if ~isempty(ind)
+        cluster_median(:,i) = nanmedian(data(:,ind),2);
+    end
+end
+return
+

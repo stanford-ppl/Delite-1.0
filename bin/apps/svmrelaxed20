@@ -1,0 +1,7 @@
+#!/bin/bash
+export JAVA_OPTS="$JAVA_OPTS -DoptimlRelaxPct=0.2"
+$DELITE_BASE/bin/dscala ppl.apps.ml.svm.SVM $*
+mv "SVM.p-1.times" "svmrelaxed20.p-1.times" 2> /dev/null
+mv "SVM.p$DELITE_NUM_THREADS.times" "svmrelaxed20.p$DELITE_NUM_THREADS.times" 2> /dev/null
+mv "SVM.p-1.error" "svmrelaxed20.p-1.error" 2> /dev/null
+mv "SVM.p$DELITE_NUM_THREADS.error" "svmrelaxed20.p$DELITE_NUM_THREADS.error" 2> /dev/null

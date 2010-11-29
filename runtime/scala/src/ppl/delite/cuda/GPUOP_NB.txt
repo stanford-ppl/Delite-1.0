@@ -1,0 +1,8 @@
+ppl.delite.dsl.optiml.Vector$OP_mapNB
+ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_sumCol
+ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_trans
+ppl.delite.dsl.optiml.specialized.DoubleVector$OPGPU_plus_single
+ppl.delite.dsl.optiml.specialized.DoubleVector$OPGPU_EQ
+ppl.delite.dsl.optiml.specialized.DoubleMatrix$OPGPU_sumColPred
+ppl.delite.dsl.optiml.specialized.DoubleVector$OPGPU_DoublePlus
+ppl.delite.dsl.optiml.specialized.DoubleVector$OPGPU_DoubleDiv

@@ -1,0 +1,1 @@
+ppl.delite.dsl.optiml.specialized.FloatMatrix$OPGPU_mult_single

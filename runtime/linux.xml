@@ -1,0 +1,55 @@
+<project name="Delite" default="all">
+  
+  <property name="scala.home" value="/u/hyouklee/local/scala" />
+  <property name="scala-compiler.jar" value="${scala.home}/lib/scala-compiler.jar" />
+  <property name="scala-library.jar" value="${scala.home}/lib/scala-library.jar" />
+  
+  <property name="src.dir" value="./scala/src" />
+  <property name="dst.dir" value="./output" />
+  <property name="cuda.src.dir" value="./scala/src/ppl/delite/cuda" />
+
+  <path id="scala.classpath">
+    <pathelement location="${scala-compiler.jar}" />
+    <pathelement location="${scala-library.jar}" />
+  </path>
+
+  <taskdef resource="scala/tools/ant/antlib.xml">
+    <classpath refid="scala.classpath" />
+  </taskdef>
+
+  <target name="delite">
+    <mkdir dir="${dst.dir}" />
+	<javac srcdir="${src.dir}" destdir="${dst.dir}">
+	  <include name="**/*.java" />
+	</javac>
+    <scalac srcdir="${src.dir}" destdir="${dst.dir}" classpathref="scala.classpath">
+	  <include name="**/*.scala" />
+	</scalac>
+	<javah classpath="${dst.dir}" destdir="${cuda.src.dir}">
+	  <class name="ppl.delite.cuda.DeliteCudaDriver" />
+	</javah>
+  </target>
+
+
+ <target name="cuda" depends="delite">
+    <mkdir dir="${dst.dir}" />
+    <exec executable="nvcc">
+	  <arg line="-arch compute_13 -code sm_13 -odir ${dst.dir} -cubin ${cuda.src.dir}/cudaKernels.cu"/>
+	</exec>
+	
+	<exec executable="nvcc">
+	  <arg line="-I/u/hyouklee/local/jdk1.6.0_16/include -lcuda -Xcompiler '-fPIC' -o ${dst.dir}/libDeliteCudaDriver.so -shared -arch compute_13 -code sm_13 ${cuda.src.dir}/cudaInit.cu ${cuda.src.dir}/cudaMem.cu ${cuda.src.dir}/cudaBLAS.cu" />
+    </exec>
+
+	<delete>
+	  <fileset dir="." includes="*.linkinfo" />
+	</delete>
+  </target>
+
+  <target name="all" depends="delite, cuda"/>
+
+  <target name="clean">
+    <delete dir="${dst.dir}" />
+  </target>
+
+</project>

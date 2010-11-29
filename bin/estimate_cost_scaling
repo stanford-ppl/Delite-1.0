@@ -1,0 +1,56 @@
+#!/usr/bin/python
+
+import re
+import sys
+import numpy
+
+# load in all of the lines, so we can do multiple passes
+lines = sys.stdin.readlines()
+
+parser = re.compile('^(.*op=)([^ ]*)(.*cost=)([0-9]*)(.*nanos=)([0-9]*)$')
+
+# populate x and y vectors for each op
+xy = {}
+for line in lines:
+  m = parser.match(line)
+  if m:
+    op = m.group(2)
+    pred = int(m.group(4))
+    meas = int(m.group(6))
+
+    # discard first sample
+    if not op in xy:
+      xy[op] = [[], []]
+    else:
+      xy[op][0] += [pred]
+      xy[op][1] += [meas]
+
+#perform the regressions
+mb = {}
+for op in xy.keys():
+  if len(xy[op][0]) > 0:
+    a = numpy.polyfit(xy[op][0], xy[op][1], 1)
+    mb[op] = [a[0], a[1]]
+
+# process the data
+for line in lines:
+  m = parser.match(line)
+  if not m:
+    sys.stdout.write(line)
+  else:
+    op = m.group(2)
+    pred = int(m.group(4))
+    if op in mb:
+      estimate = mb[op][0] * pred + mb[op][1]
+    else:
+      # we discarded the first sample and didn't find any others, just use the
+      # elapsed time
+      estimate = int(m.group(6))
+    sys.stdout.write("%s%s%s%d%s%s : orig_cost=%s\n" % (
+        m.group(1),
+        m.group(2),
+        m.group(3),
+        estimate,
+        m.group(5),
+        m.group(6),
+        m.group(4)))

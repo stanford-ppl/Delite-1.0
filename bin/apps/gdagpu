@@ -1,0 +1,3 @@
+#!/bin/bash
+export JAVA_OPTS="-Xmx20g -XX:+UseCompressedOops -Dcpu-thread-num-override=true -Dthread-num=1 -DexecutorType=gpu -Dgpu-mem-size1=524288 -Dgpu-mem-size2=1048576 -Dgpu-memblock-size1=16 -Dgpu-memblock-size2=32768 -Dgpu-ops-filename=GPUOP_GDA.txt" 
+$DELITE_BASE/bin/dscala ppl.apps.ml.gda.GDA_GPU $*

@@ -1,0 +1,2 @@
+#!/bin/bash
+$DELITE_BASE/bin/dscala ppl.apps.ml.svm.SVM $*

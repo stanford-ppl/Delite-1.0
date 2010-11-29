@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# This is a wrapper that sets up the bootclasspath and classpath
+# for executing Scala programs in Delite.
+
+DELITE_BASE=`dirname $0`/..
+DELITE_ABS=$(readlink -f $DELITE_BASE)
+
+HOSTNAME=`hostname`
+PROPS=$DELITE_BASE/config/$HOSTNAME.properties
+EXT_LIBS=$DELITE_BASE/ext_libs
+
+JAVA_HOME=`awk -F= '$1=="jdk.home" {print $2}' $PROPS`
+SCALA_HOME=`awk -F= '$1=="scala.home" {print $2}' $PROPS`
+
+if [ ! -f "$PROPS" -o "x$JAVA_HOME" = "x" -o "x$SCALA_HOME" = "x" ]; then
+  echo "Unable to load jdk.home and scala.home from properties file $PROPS" 1>&2
+  exit 1
+fi
+
+#JAVA_OPTS="$JAVA_OPTS -Xrunhprof:cpu=samples,depth=10"
+
+## default, must be set before calling dscala
+if [ -z `echo $DELITE_NUM_THREADS` ]
+then
+  DELITE_NUM_THREADS=1
+fi
+
+JAVACMD=$JAVA_HOME/bin/java
+JAVA_OPTS="$JAVA_OPTS -Dthread-num=$DELITE_NUM_THREADS -Ddelite.basedir=$DELITE_ABS -Ddefer=true -d64  -XX:MaxDirectMemorySize=2g -XX:+UseCompressedOops -XX:+DoEscapeAnalysis -Xmx16g -Xms2g -server -Xbootclasspath/p:$DELITE_BASE/agent/classes"
+
+if [ ! `uname -m` = "sun4v" ]; then
+  JAVA_OPTS="$JAVA_OPTS -XX:+UnlockExperimentalVMOptions"
+fi
+
+if [ "x$1" = "x--oprofile" ]; then
+  shift
+  export LD_LIBRARY_PATH="/usr/local/lib/oprofile:$LD_LIBRARY_PATH"
+  JAVA_OPTS="$JAVA_OPTS -agentlib:jvmti_oprofile=debug"
+fi
+
+export JAVA_HOME JAVACMD JAVA_OPTS DELITE_BASE
+
+# This setting needs to be moved to runtime setting
+export OMP_NUM_THREADS=$DELITE_NUM_THREADS
+if [ ! `uname -m` = "sun4v" ]; then
+  export LD_PRELOAD=$JAVA_HOME/jre/lib/amd64/libjsig.so
+fi
+
+exec $SCALA_HOME/bin/scala -cp $EXT_LIBS/jsr166y.jar:$EXT_LIBS/ScalaCheck-1.5.jar:$EXT_LIBS/log4j-1.2.15.jar:$DELITE_BASE/cnative/lib:$DELITE_BASE/runtime/scala/classes:$DELITE_BASE/apps/scala/classes:$DELITE_BASE/delite-sim/classes "$@"

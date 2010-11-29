@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./perftest.py gdagpu linreggpu nbgpu lbpgpu kmeansgpu matmulttestgpu rbmgpu svmgpu

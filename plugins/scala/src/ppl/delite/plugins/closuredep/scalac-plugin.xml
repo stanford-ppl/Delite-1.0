@@ -1,0 +1,4 @@
+<plugin>
+  <name> closuredep </name>
+  <classname> ppl.delite.plugins.closuredep.ClosureDependencyExtractor </classname>
+</plugin>

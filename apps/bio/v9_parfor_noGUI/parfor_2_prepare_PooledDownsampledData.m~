@@ -1,0 +1,59 @@
+function parfor_2_prepare_PooledDownsampledData(all_filenames, target_prctile, exclude_prctile,PooledDownsampledDataFilename)
+
+if ~exist('PooledDownsampledDataFilename')
+    PooledDownsampledDataFilename = 'PooledDownsampledData.mat';
+end
+
+all_data=[];
+tube_channel=[];
+all_local_density=[];
+for i=1:length(all_filenames)
+    display(['downsampling and pooling fcs file: ',num2str(i),'/',num2str(length(all_filenames))]);
+    display(all_filenames{i});
+    load([all_filenames{i}(1:end-4),'.mat'])
+    if i==1
+        RefDataSize = size(data,2);
+        all_marker_names = marker_names;
+        used_marker_names = marker_names(used_markers);
+    else
+        used_marker_names = unique([used_marker_names;marker_names(used_markers)]);
+    end
+    
+    if target_prctile<100
+        target_density = prctile(local_density,target_prctile);
+    elseif target_prctile>=100  % then this variable contains the number of desired cells we want 
+    keep_prob = min(1,(target_density./local_density));
+    is_keep = rand(1,length(local_density))<keep_prob;  
+    is_keep(find(sum(isnan(data))~=0))=0;
+    is_keep(local_density<=prctile(local_density,exclude_prctile))=0;
+    display([num2str(sum(is_keep)),' cells keeped in this fcs file'])
+    data = data(:,is_keep);
+    local_density = local_density(is_keep)/length(is_keep)*RefDataSize;
+    
+    if isequal(marker_names,all_marker_names)
+        all_data = [all_data,data];
+    else
+        new_marker_names = setdiff(marker_names,all_marker_names);
+        all_marker_names = [all_marker_names;new_marker_names];
+        all_data = [all_data;repmat(NaN,length(new_marker_names),size(all_data,2))];
+        data_tmp = zeros(size(all_data,1),size(data,2))+NaN;
+        [C,IA,IB] = intersect(marker_names,all_marker_names);
+        data_tmp(IB,:) = data(IA,:);
+        all_data = [all_data, data_tmp];
+    end
+    all_local_density = [all_local_density,local_density];
+    tube_channel = [tube_channel,repmat(i,1,size(data,2))];
+end
+all_data = [all_data;tube_channel];
+all_marker_names{end+1} = 'tube';
+
+data = all_data;
+marker_names = all_marker_names;
+local_density = all_local_density;
+[C,used_marker,IB] = intersect(marker_names, used_marker_names); 
+used_marker = sort(used_marker);
+save(PooledDownsampledDataFilename, 'data', 'local_density', 'marker_names', 'used_markers');
+
+display(' ')
+display(['PooledDownsampledData has ', num2str(size(data,2)), ' cells from ', num2str(length(all_filenames)), ' files'])
+display(' ')
