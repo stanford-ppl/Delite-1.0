@@ -45,7 +45,14 @@ object BaselineGraph {
       }
     }
 
-    // def untilConverged[V, E](c: Consistency.Consistency, f: (V, Scope[V, E]) => Unit, max_iter: Int = 1000) (block: V => V)
+    def untilConverged[V, E](g: BaselineGraph[V,E], c: Consistency.Consistency, f: (V, Scope[V, E]) => Unit, max_iter: Int = 1000, cf: BaselineGraph[V, E] => Boolean) {
+      var iter = 0
+
+      do {
+        runUpdateFunction(g, c)(f)
+        iter += 1
+      } while(!cf(g) && iter < max_iter)
+    }
 
     object Consistency extends Enumeration {
       type Consistency = Value
