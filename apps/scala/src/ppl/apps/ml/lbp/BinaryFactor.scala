@@ -68,4 +68,10 @@ class BinaryFactor(val v1: Int = 0, val arity1: Int = 0, val v2: Int = 0, val ar
       }
     }
   }
+
+  override def toString() : String = {
+    (0 until arity1).map((i) => {
+      (0 until arity2).map((j) => logP(i, j)).mkString(" ")
+    }).mkString("\n")
+  }
 }

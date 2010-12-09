@@ -3,6 +3,7 @@ package ppl.apps.ml.baseline.lbp
 import collection.mutable.Queue
 import collection.mutable.Map
 import collection.Set
+import collection.mutable.{Set => MSet}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -13,7 +14,7 @@ import collection.Set
  */
 
 object Graph {
-    class Scope[V, E](v : V, es: Set[E], nbrs: Set[V], g: Graph[V, E], t: Queue[V]) {
+    class Scope[V, E](v : V, es: Set[E], nbrs: Set[V], g: Graph[V, E], t: Queue[V], ts: MSet[V]) {
       val vertexData = v
       var edgeAccess = false
       var neighborAccess = false
@@ -29,18 +30,25 @@ object Graph {
       }
 
       def enqueueUpdateFunctionVertex(c: Consistency.Consistency, v: V)(f: (V, Scope[V, E])  => Unit) {
-        t += v
+        if(!ts.contains(v)) {
+          t += v
+          ts += v
+        }
       }
     }
 
+  // Fix this scheduler, don't allow repeated tasks for one vertex
     def runUpdateFunction[V, E](g: Graph[V,E], c: Consistency.Consistency)(f: (V, Scope[V, E]) => Unit) {
+      val taskSet = MSet[V]()
       val tasks = Queue[V]()
       tasks ++= g.vertexSet
+      taskSet ++= g.vertexSet
 
       while(!tasks.isEmpty) {
         val v = tasks.dequeue
+        taskSet -= v
 
-        val scope = new Scope(v, g.edgesOf(v), g.neighbors(v), g, tasks)
+        val scope = new Scope(v, g.edgesOf(v), g.neighbors(v), g, tasks, taskSet)
         f(v, scope)
       }
     }
