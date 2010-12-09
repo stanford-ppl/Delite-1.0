@@ -17,7 +17,7 @@ class TestEdge(var value: Int = 0)
 
 object GraphTest {
   def main(args: Array[String]) : Unit = {
-    val g = new GraphImpl[TestVertex, TestEdge]()
+    val g = new UndirectedGraphImpl[TestVertex, TestEdge]()
 
     val vs = List(new TestVertex(1), new TestVertex(2), new TestVertex(1))
     val es = List(new TestEdge(3), new TestEdge(0))

@@ -8,6 +8,11 @@ package ppl.apps.ml.lbp
  * To change this template use File | Settings | File Templates.
  */
 
+/**
+ * A binary factor is a table over a pair of variables and is
+ * associated with each edge in a pairwise markov random field.  All
+ * data is represented in log form.
+ */
 class BinaryFactor(val v1: Int = 0, val arity1: Int = 0, val v2: Int = 0, val arity2: Int = 0) {
   val data = Array.fill(arity1 * arity2)(0.0)
 

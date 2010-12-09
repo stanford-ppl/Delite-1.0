@@ -1,15 +1,19 @@
 package ppl.apps.ml.lbp
 
 /**
- * Created by IntelliJ IDEA.
- * User: mmwu
- * Date: Dec 6, 2010
- * Time: 5:28:12 PM
- * To change this template use File | Settings | File Templates.
+ * author: Michael Wu (mikemwu@stanford.edu)
+ * last modified: 12/08/10
+ *
+ * Pervasive Parallelism Laboratory (PPL)
+ * Stanford University
+ *
+ * Ported from GraphLab
+ *
+ * A unary factor is a table over a single variable and is associated
+ * with edge variable in the pairwise markov random field.  Unary
+ * factors are also used to represent messages. All data is
+ * represented in log form.
  */
-
-object Factor {
-}
 
 class UnaryFactor(var v: Int, val arity: Int) {
   val data = Array.fill(arity)(0.0)
@@ -33,13 +37,13 @@ class UnaryFactor(var v: Int, val arity: Int) {
   def normalize() = {
     assert(arity > 0)
 
-    val max = data.reduceLeft((a: Double, b: Double) => if(a > b) a else b)
+    val max = data.reduceLeft((a: Double, b: Double) => Math.max(a, b))
 
     // Scale and compute normalizing constant
     var Z = 0.0
     for(asg <- 0 until arity) {
       Z += Math.exp(logP(asg) - max)
-      logP(asg) -= - max
+      logP(asg) -= max
     }
 
     assert(Z > 0)
@@ -50,6 +54,7 @@ class UnaryFactor(var v: Int, val arity: Int) {
     }
   }
 
+  // Multiply elementwise by other factor
   def times(other: UnaryFactor) = {
     assert(arity == other.arity)
 
@@ -58,6 +63,7 @@ class UnaryFactor(var v: Int, val arity: Int) {
     }
   }
 
+  // Add other factor elementwise
   def plus(other: UnaryFactor) = {
     assert(arity == other.arity)
 
@@ -66,6 +72,7 @@ class UnaryFactor(var v: Int, val arity: Int) {
     }
   }
 
+  // Divide elementwise by other factor
   def divide(other: UnaryFactor) = {
     assert(arity == other.arity)
 
@@ -74,12 +81,13 @@ class UnaryFactor(var v: Int, val arity: Int) {
     }
   }
 
+  // this(x) = sum_y fact(x,y) * other(y)
   def convolve(bin_fact: BinaryFactor, other: UnaryFactor) : Unit = {
     for(x <- 0 until arity) {
       var sum = 0.0
 
       for(y <- 0 until other.arity) {
-        sum += Math.exp(bin_fact.logP(v, x, other.v, y)) + other.logP(y)
+        sum += Math.exp(bin_fact.logP(v, x, other.v, y) + other.logP(y))
       }
 
       assert( !(sum < 0) )

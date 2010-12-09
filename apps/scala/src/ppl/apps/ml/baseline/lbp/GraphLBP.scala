@@ -11,7 +11,11 @@ import ppl.apps.ml.lbp._
  * Stanford University
  */
 
-class Edge(var message: UnaryFactor, var old_message: UnaryFactor)
+class Edge(var message: UnaryFactor, var old_message: UnaryFactor) {
+  def copy() : Edge = {
+    new Edge(message.copy(), old_message.copy())
+  }
+}
 class Vertex(var potential: UnaryFactor, var belief: UnaryFactor)
 
 // Edge that can pass message back and forth between two vertices
@@ -29,6 +33,12 @@ class MessageEdge(val v1: Vertex, val inEdgeV1 : Edge, val v2: Vertex, val inEdg
 
     if(v == v1) inEdgeV2 else inEdgeV1
   }
+
+  def notMe(v: Vertex) : Vertex = {
+    assert(v == v1 || v == v2)
+
+    if(v == v1) v2 else v1
+  }
 }
 
 object GraphLBP {
@@ -41,13 +51,17 @@ object GraphLBP {
   var lambda = 10
   var smoothing = "laplace"
 
+  var count = 1
+
   val edgePotential = new BinaryFactor(0, colors, 0, colors)
 
   def main(args: Array[String]) = {
     // Generate image
     val img = new LBPImage(rows, cols)
     img.paintSunset(colors)
+    img.save("src_img.pgm")
     img.corrupt(sigma)
+    img.save("noise_img.pgm")
 
     // Construct graph from image
     val g = constructGraph(img, colors, sigma)
@@ -98,8 +112,9 @@ object GraphLBP {
       
       // Compute message residual
       val residual = outMsg.residual(outEdge.old_message)
+
       if(residual > bound) {
-        scope.enqueueUpdateFunctionVertex(Consistency.Edge, v)(bpUpdate)
+        scope.enqueueUpdateFunctionVertex(Consistency.Edge, me.notMe(v))(bpUpdate)
       }
     }
   }
@@ -141,18 +156,27 @@ object GraphLBP {
     message.uniform()
     message.normalize()
 
+    val oldMessage = message.copy()
+
+    val templateEdge = new Edge(message, oldMessage)
+    val baseEdge = templateEdge.copy()
+
     // Add bidirectional edges between neighboring pixels
     for(i <- 0 until img.rows - 1) {
       for(j <- 0 until img.cols - 1) {
-        val edgeRight = new Edge(message.copy(img.vertid(i, j+1)), message.copy(img.vertid(i, j+1)))
-        val edgeRightBack = new Edge(message.copy(img.vertid(i, j)), message.copy(img.vertid(i, j)))
+        message.v = img.vertid(i, j+1)
+        oldMessage.v = img.vertid(i, j+1)
+        
+        val edgeRight = templateEdge.copy()
 
-        g.addEdge(new MessageEdge(vertices(i)(j), edgeRight, vertices(i)(j+1), edgeRightBack), vertices(i)(j), vertices(i)(j+1))
+        g.addEdge(new MessageEdge(vertices(i)(j), edgeRight, vertices(i)(j+1), baseEdge.copy()), vertices(i)(j), vertices(i)(j+1))
 
-        val edgeDown = new Edge(message.copy(img.vertid(i+1, j)), message.copy(img.vertid(i+1, j)))
-        val edgeDownBack = new Edge(message.copy(img.vertid(i, j)), message.copy(img.vertid(i, j)))
+        message.v = img.vertid(i+1, j)
+        oldMessage.v = img.vertid(i+1, j)
 
-        g.addEdge(new MessageEdge(vertices(i)(j), edgeDown, vertices(i+1)(j), edgeDownBack), vertices(i)(j), vertices(i+1)(j))
+        val edgeDown = templateEdge.copy()
+
+        g.addEdge(new MessageEdge(vertices(i)(j), edgeDown, vertices(i+1)(j), baseEdge.copy()), vertices(i)(j), vertices(i+1)(j))
       }
     }
 

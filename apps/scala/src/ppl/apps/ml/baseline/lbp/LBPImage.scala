@@ -46,8 +46,27 @@ class LBPImage(val rows: Int, val cols: Int) {
 
   // Corrupt the image with Gaussian noise
   def corrupt(sigma: Double) = {
-    for(i <- 0 until(rows * cols, 2)) {
+    for(i <- 0 until rows * cols) {
       data(i) += Random.nextGaussian * sigma
     }
+  }
+
+  def save(filename: String) = {
+    var out_file = new java.io.FileOutputStream(filename) 
+    var out_stream = new java.io.PrintStream(out_file)
+
+    out_stream.println("P2")
+    out_stream.println(cols + " " + rows)
+    out_stream.println(255)
+
+    val min = data.reduceLeft((a, b) => Math.min(a, b))
+    val max = data.reduceLeft((a, b) => Math.max(a, b))
+
+    for(i <- 0 until rows) {
+       out_stream.println((0 until cols).map((j : Int) => {if(min != max) (255.0 * (data(vertid(i, j)) - min) / (max - min)).toInt else 0}
+        ).mkString("\t"))
+    }
+
+    out_stream.close
   }
 }
