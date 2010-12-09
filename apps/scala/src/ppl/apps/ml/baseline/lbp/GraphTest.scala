@@ -1,7 +1,6 @@
-package ppl.delite.dsl.optiml
+package ppl.apps.ml.baseline.lbp
 
-import ppl.apps.ml.lbp.BaselineGraph.Scope
-import ppl.apps.ml.lbp.{BaselineGraph, BaselineGraphImpl}
+import ppl.apps.ml.baseline.lbp.Graph.Scope
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -17,8 +16,8 @@ class TestVertex(var value: Int = 0)
 class TestEdge(var value: Int = 0)
 
 object GraphTest {
-  def main = {
-    val g = new BaselineGraphImpl[TestVertex, TestEdge]()
+  def main(args: Array[String]) : Unit = {
+    val g = new GraphImpl[TestVertex, TestEdge]()
 
     val vs = List(new TestVertex(1), new TestVertex(2), new TestVertex(1))
     val es = List(new TestEdge(3), new TestEdge(0))
@@ -32,13 +31,19 @@ object GraphTest {
        v.value += 1;
 
       if(v.value < 3) {
-        scope.enqueueUpdateFunctionVertex(BaselineGraph.Consistency.Auto, v) (updateFunction)
+        scope.enqueueUpdateFunctionVertex(Graph.Consistency.Auto, v) (updateFunction)
       }
     }
 
-    BaselineGraph.runUpdateFunction(g, BaselineGraph.Consistency.Auto) (updateFunction)
+    Graph.runUpdateFunction(g, Graph.Consistency.Auto) (updateFunction)
 
-    val values = g.getVertices map {_.value}
+    val values = g.vertexSet.toList map {_.value}
+    println(values)
     val total = values.foldLeft(0)((acc, value) => acc + value)
+    println(total)
+
+    println(vs(0).value)
+    println(vs(1).value)
+    println(vs(2).value)
   }
 }
