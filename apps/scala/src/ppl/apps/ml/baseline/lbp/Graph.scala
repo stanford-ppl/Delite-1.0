@@ -1,9 +1,7 @@
 package ppl.apps.ml.baseline.lbp
 
-import collection.mutable.Queue
-import collection.mutable.Map
 import collection.Set
-import collection.mutable.{Set => MSet}
+import collection.mutable.{ArrayBuffer, Queue, Map, Set => MSet}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -41,7 +39,7 @@ object Graph {
     def runUpdateFunction[V, E](g: Graph[V,E], c: Consistency.Consistency)(f: (V, Scope[V, E]) => Unit) {
       val taskSet = MSet[V]()
       val tasks = Queue[V]()
-      tasks ++= g.vertexSet
+      tasks ++= g.vertexList
       taskSet ++= g.vertexSet
 
       while(!tasks.isEmpty) {
@@ -69,6 +67,7 @@ object Graph {
 }
 
 trait Graph[V, E] {
+  def vertexList() : List[V]
   def vertexSet() : Set[V]
   def edgeSet() : Set[E]
 
@@ -94,9 +93,11 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V,E] {
   val edge_map = Map[E, (V, V)]()
   val vertices_edge_map = Map[(V, V), E]()
   val vertex_edge_list = Map[V, Set[(E, V)]]()
+  val vertex_list = ArrayBuffer[V]()
 
   val tasks = Queue[V]()
 
+  def vertexList() = vertex_list.toList
   def vertexSet() = vertex_edge_list.keySet
   def edgeSet() = edge_map.keySet
 
@@ -122,6 +123,7 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V,E] {
 
   def addVertex(v: V) = {
     if(!vertex_edge_list.contains(v)) {
+      vertex_list += v
       vertex_edge_list(v) = Set()
     }
   }
@@ -158,6 +160,7 @@ class DirectedGraphImpl[V, E] extends DirectedGraph[V,E] {
 
   val tasks = Queue[V]()
 
+  def vertexList() = in_edge_list.keySet.toList
   def vertexSet() = in_edge_list.keySet
   def edgeSet() = edge_map.keySet
 

@@ -1,6 +1,7 @@
 package ppl.apps.ml.baseline.lbp
 
 import util.Random
+import java.io.{BufferedReader, FileReader}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -9,6 +10,39 @@ import util.Random
  * Pervasive Parallelism Laboratory (PPL)
  * Stanford University
  */
+
+object LBPImage {
+  def load(filename: String) : LBPImage = {
+    val xfs = new BufferedReader(new FileReader(filename))
+
+    var line = xfs.readLine()
+    line = line.trim()
+    var rowscols = line.split("\\s+")
+
+    val rows = java.lang.Integer.parseInt(rowscols(0))
+    val cols = java.lang.Integer.parseInt(rowscols(1))
+
+    val img = new LBPImage(rows, cols)
+
+    line = xfs.readLine()
+
+    var i = 0
+    while (line != null){
+      line = line.trim()
+      val pixels = line.split("\\s+")
+
+      for (j <- 0 until Math.min(cols, pixels.length)){
+        img.data(img.vertid(i, j)) = java.lang.Double.parseDouble(pixels(j))
+      }
+
+      line = xfs.readLine()
+      i += 1
+    }
+    xfs.close()
+
+    img
+  }
+}
 
 class LBPImage(val rows: Int, val cols: Int) {
   val data = Array.fill(rows * cols)(0.0)

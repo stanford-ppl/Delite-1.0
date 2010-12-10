@@ -56,6 +56,11 @@ object GraphLBP {
 
   val edgePotential = new BinaryFactor(0, colors, 0, colors)
 
+  /* Residual printing
+  var out_file = new java.io.FileOutputStream("residuals_scala.txt") 
+  var out_stream = new java.io.PrintStream(out_file)
+*/
+
   def main(args: Array[String]) = {
     // Generate image
     val img = new LBPImage(rows, cols)
@@ -63,6 +68,9 @@ object GraphLBP {
     img.save("src_img.pgm")
     img.corrupt(sigma)
     img.save("noise_img.pgm")
+
+    /*val img = LBPImage.load("noisy_image.raw")
+    img.save("check_img.pgm")*/
 
     // Construct graph from image
     val g = constructGraph(img, colors, sigma)
@@ -90,7 +98,11 @@ object GraphLBP {
       }
     }
 
+    // Save the predicted image
     img.save("pred_img.pgm")
+
+    /*out_stream.println(count)
+    out_stream.close*/
   }
 
   def bpUpdate(v: Vertex, scope: Scope[Vertex, MessageEdge]) {
@@ -99,6 +111,7 @@ object GraphLBP {
       me.in(v).old_message = me.in(v).message
     }
 
+    // count += 1
     
     v.belief = v.potential.copy()
 
@@ -131,12 +144,12 @@ object GraphLBP {
       // Compute message residual
       val residual = outMsg.residual(outEdge.old_message)
 
-      count += 1
-      if(count % 10000 == 0) {
-        println(residual)
-        println(count)
-      }
+      /*
+      if(count < 5000) {
+        out_stream.println("in: " + outMsg.v + " out: " + me.in(v).message.v + " " + residual)
+      } */
 
+      // Enqueue update function on target vertex if residual is greater than bound
       if (residual > bound) {
         scope.enqueueUpdateFunctionVertex(Consistency.Edge, me.notMe(v))(bpUpdate)
       }
@@ -182,14 +195,20 @@ object GraphLBP {
 
     val oldMessage = message.copy()
 
+    val message2 = message.copy()
+    val oldMessage2 = message.copy()
+
     val templateEdge = new Edge(message, oldMessage)
-    val baseEdge = templateEdge.copy()
+    val baseEdge = new Edge(message2, oldMessage2)
 
     // Add bidirectional edges between neighboring pixels
     for (i <- 0 until img.rows - 1) {
       for (j <- 0 until img.cols - 1) {
         message.v = img.vertid(i, j + 1)
         oldMessage.v = img.vertid(i, j + 1)
+
+        message2.v = img.vertid(i, j)
+        oldMessage2.v = img.vertid(i, j)
 
         val edgeRight = templateEdge.copy()
 
