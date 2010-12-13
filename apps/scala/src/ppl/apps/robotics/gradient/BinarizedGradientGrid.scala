@@ -1,10 +1,10 @@
 package ppl.apps.robotics.gradient
 
 import ppl.delite.dsl.optiml._
-import collection.mutable.ArrayBuffer
+import ppl.delite.dsl.optiml.appinclude._
+import ppl.delite.dsl.optiml.Precursors._
 import ppl.delite.metrics._
 import ppl.delite.core.appinclude._
-import ppl.delite.dsl.optiml.appinclude._
 
 
 /**
@@ -69,7 +69,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
   }
 
   val all_templates = Vector[Vector[BinarizedGradientTemplate]]()
-  val names = new ArrayBuffer[String]()
+  val names = Vector[String]()
 
   readModels()
 
@@ -102,8 +102,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     tpl.radius = r
     tpl.level = level
     tpl.binary_gradients = Array.fill(span * span)(0) //Create the template
-    tpl.match_list = new ArrayBuffer[Int]()
-    tpl.match_list.sizeHint(span * span)
+    tpl.match_list = Vector[Int]()
 
     //Bear with me, we have to worry a bit about stepping off the image boundaries:
     val rows = gradSummary.rows
@@ -167,8 +166,8 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     tpl.radius = r
     tpl.level = level
     tpl.binary_gradients = Array.fill(span * span)(0) //Create the template
-    tpl.match_list = new ArrayBuffer[Int]()
-    tpl.match_list.sizeHint(span * span)
+    tpl.match_list = Vector[Int]()
+
     tpl.rect = new Rect(0, 0, roi.width, roi.height)
 
     // set mask
@@ -189,10 +188,6 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     val yc = (roi.y + roi.height / 2) / reduction_factor
     var xr = roi.width / 2 / reduction_factor
     var yr = roi.height / 2 / reduction_factor
-    val rows = gradSummary.rows
-    val cols = gradSummary.cols
-
-    //    printf("x: %d, y: %d\n", xc,yc);
 
     if (xr > r) {
       xr = r
@@ -201,6 +196,8 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
       yr = r
     }
 
+    val rows = gradSummary.rows
+    val cols = gradSummary.cols
     //y
     var ystart = yc - yr
     var yoffset = r - yr //offset before you reach the playing field
@@ -226,7 +223,6 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     }
 
     tpl.hist = Vector[Float](8)
-//    var cnt = 0
 
     //Fill the binary _gradients
     for (y <- ystart until yend) {
@@ -239,20 +235,8 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
           //Record where gradients are
           tpl.match_list += index
         }
-        //            printf("Match list size: %d\n", tpl.match_list.size());
-
-        //            for (int i=0;i<8;++i) {
-        //            	if (*b&(1<<i)) {
-        //            		tpl.hist[i]+=1;
-        //            		cnt++;
-        //            	}
-        //            }
       }
     }
-
-    //    for (int i=0;i<8;++i) {
-    //    	tpl.hist[i] /= cnt;
-    //    }
 
     tpl
   }
@@ -283,9 +267,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
       }
     }
     else {
-      for (i <- 0 until crt_detections.length) {
-        detections += crt_detections(i)
-      }
+      detections ++= crt_detections
     }
   }
 
@@ -322,7 +304,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
       j =>
         val res = templates(j).score(crt_template, accept_threshold, match_table, match_method_)
         if (res > accept_threshold) {
-          println("Level: " + level + ", score: " + res)
+//          println("Level: " + level + ", score: " + res)
           val detection = new BiGGDetection()
           val bbox = templates(j).rect
 
@@ -342,14 +324,14 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     }
   }
 
-  val detectionMsg = new ArrayBuffer[BiGGDetection]()
+  var detectionMsg = Vector[BiGGDetection]()
 
   /**
    * Runs the object detection of the current image.
    */
   def detectMain(image: Image) = {
     // forget about previous detections
-    detectionMsg.clear()
+    detectionMsg = Vector[BiGGDetection]()
 
     val img_gray = image // assuming image is single-channel. Needs to be made such if not.
 
@@ -368,7 +350,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
 
     println("Doing detection")
 
-    val all_detections = new ArrayBuffer[BiGGDetection]()
+    val all_detections = Vector[BiGGDetection]()
     var index = 0
     PerformanceTimer.start("detectLoop")
     all_templates.foreach {
@@ -384,29 +366,28 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
             all_detections += detection
         }
 
-        for (i <- 0 until detections.length) {
-          all_detections += detections(i)
-        }
+        all_detections ++= detections  // This is in the original code for some strange reason.  Remove?
         index += 1
     }
-    helper.nonMaxSuppress(all_detections, fraction_overlap_)
+    val filteredDetections = helper.nonMaxSuppress(all_detections, fraction_overlap_)
+    println("Total detections: " + filteredDetections.length)
     PerformanceTimer.stop("detectLoop")
     PerformanceTimer.print("detectLoop")
 
-    detectionMsg.sizeHint(all_detections.length)
-    for (i <- 0 until all_detections.length) {
-      val tpl = all_detections(i).tpl
-      val mask = new Image(tpl.rect.height, tpl.rect.width)
-      for (j <- 0 until tpl.mask_list.length) {
-        val x = tpl.mask_list(j) % tpl.rect.width
-        val y = tpl.mask_list(j) / tpl.rect.width
-        mask.data(y, x) = 255
-      }
-      all_detections(i).mask = mask
-      //convert BiGGDetection struct  to Detection message
-      detectionMsg(i) = all_detections(i)
-
-      // Commented out due to lack of indices support.  This code is never used
+    // NEEDS TO BE RE-ADDED FOR FAIR C++ COMPARISON!
+//    detectionMsg.sizeHint(all_detections.length)
+//    for (i <- 0 until all_detections.length) {
+//      val tpl = all_detections(i).tpl
+//      val mask = new Image(tpl.rect.height, tpl.rect.width)
+//      for (j <- 0 until tpl.mask_list.length) {
+//        val x = tpl.mask_list(j) % tpl.rect.width
+//        val y = tpl.mask_list(j) / tpl.rect.width
+//        mask.data(y, x) = 255
+//      }
+//      all_detections(i).mask = mask
+//      //convert BiGGDetection struct  to Detection message
+//      detectionMsg += all_detections(i)
+//
 //      val d = all_detections(i)
 //      // fill in indices vector (used for point cloud segmentation)
 //      for (j <- 0 until tpl.mask_list.length) {
@@ -415,12 +396,12 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
 //        val index = (d.roi.y + y) * image.cols + (d.roi.x + x)
 //        detectionMsg(i).mask.indices.indices.push_back(index)
 //      }
-    }
+//    }
   }
 
 /**  ////// OMITTED TRAINING STUFF
 
-var root_templates_: ArrayBuffer[BinarizedGradientTemplate]
+var root_templates_: Vector[BinarizedGradientTemplate]
 var crt_object_: Int
 
 /**
@@ -442,7 +423,7 @@ def startTraining(name: String) = {
 	}
 }
 
-def trainInstance(img: Image, level: Int, pyr: BinarizedGradientPyramid, mask_pyr: BinarizedGradientPyramid, templates: ArrayBuffer[BinarizedGradientTemplate], roi: Rect, mask: Image, template_radius: Float, accept_threshold: Float) = {
+def trainInstance(img: Image, level: Int, pyr: BinarizedGradientPyramid, mask_pyr: BinarizedGradientPyramid, templates: Vector[BinarizedGradientTemplate], roi: Rect, mask: Image, template_radius: Float, accept_threshold: Float) = {
 	BinarizedGradientTemplate bgt;
 	std::vector<BiGGDetection> detections;
 	float reduction_factor = float(1<<level);
@@ -684,10 +665,12 @@ def endTraining(name: String) = {
   val magnitude_threshold_ = 200
 
   // Start level in the pyramid
-  val start_level_ = 2
+//  val start_level_ = 2
+  val start_level_ = 3
 
   // Levels in the pyramid
-  val levels_ = 2
+//  val levels_ = 2
+  val levels_ = 1
 
   // Fraction overlap between two detections above which one of them is suppressed
   val fraction_overlap_ = 0.6f

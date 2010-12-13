@@ -1,6 +1,7 @@
 package ppl.apps.robotics.gradient
 
 import ppl.delite.dsl.optiml._
+import ppl.delite.dsl.optiml.appinclude._
 import java.io.{BufferedReader, FileReader}
 
 /**
@@ -30,7 +31,7 @@ class Image(val rows: Int, val cols: Int, val data: Matrix[Int]) {
 
     for (i <- 0 until downsampled.rows) {
       for (j <- 0 until downsampled.cols) {
-        downsampled.data(i, j) = data(i, j) | data(i + 1, j) | data(i, j + 1) | data(i + 1, j + 1)
+        downsampled.data(i, j) = data(2*i, 2*j) | data(2*i + 1, 2*j) | data(2*i, 2*j + 1) | data(2*i + 1, 2*j + 1)
       }
     }
     downsampled

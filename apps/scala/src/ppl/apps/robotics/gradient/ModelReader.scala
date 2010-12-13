@@ -1,7 +1,6 @@
 package ppl.apps.robotics.gradient
 
 import java.io.{BufferedReader, FileReader}
-import collection.mutable.ArrayBuffer
 import ppl.delite.dsl.optiml._
 import ppl.delite.dsl.optiml.appinclude._
 
@@ -47,8 +46,7 @@ object ModelReader {
     temp = file.readLine().trim.split(" ")
     if (temp(0) != "Match_list:") throw new RuntimeException("Illegal data format")
     val matchListSize = Integer.parseInt(temp(1))
-    val matchList = ArrayBuffer[Int]()
-    matchList.sizeHint(matchListSize)
+    val matchList = Vector[Int]()
     val matchListString = file.readLine().trim.split(" ")
     for (i <- 0 until matchListSize) {
       matchList += Integer.parseInt(matchListString(i))
@@ -57,7 +55,7 @@ object ModelReader {
     temp = file.readLine().trim.split(" ")
     if (temp(0) != "Occlusions:") throw new RuntimeException("Illegal data format")
     val occlusionsSize = Integer.parseInt(temp(1))
-    val occlusions = ArrayBuffer[ArrayBuffer[Int]]()
+    val occlusions = Vector[Vector[Int]]()
     val occlusionsString = file.readLine().trim.split(" ")
     if (occlusionsSize != 0) throw new RuntimeException("Occlusions not supported.")
 

@@ -1,6 +1,7 @@
 package ppl.apps.robotics.gradient
 
-import collection.mutable.ArrayBuffer
+import ppl.delite.dsl.optiml._
+import ppl.delite.dsl.optiml.appinclude._
 
 /**
  * Created by IntelliJ IDEA.
@@ -11,7 +12,7 @@ import collection.mutable.ArrayBuffer
  */
 
 class BinarizedGradientPyramid(gradientImage: Image, val start_level: Int, val levels: Int) {
-  val pyramid = new ArrayBuffer[Image]()
+  val pyramid = Vector[Image]()
 
   var crt = gradientImage
   for (i <- 0 until start_level + levels) {
@@ -22,6 +23,7 @@ class BinarizedGradientPyramid(gradientImage: Image, val start_level: Int, val l
       crt = crt.downsample()
     }
   }
+  println(pyramid.length)
 
   def getIndex(index: Int) = pyramid(index - start_level)
 }

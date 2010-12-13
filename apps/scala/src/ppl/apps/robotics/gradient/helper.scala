@@ -1,6 +1,7 @@
 package ppl.apps.robotics.gradient
 
-import collection.mutable.ArrayBuffer
+import ppl.delite.dsl.optiml._
+import ppl.delite.dsl.optiml.appinclude._
 
 /**
  * Created by IntelliJ IDEA.
@@ -49,7 +50,7 @@ object helper {
    * @param detections vector of detections to work with
    * @param frac_overlap what fraction of overlap between 2 rectangles constitutes overlap
    */
-  def nonMaxSuppress(detections: ArrayBuffer[BiGGDetection], frac_overlap: Float) = {
+  def nonMaxSuppress(detections: Vector[BiGGDetection], frac_overlap: Float): Vector[BiGGDetection] = {
     var len = detections.length
 
     var i = 0
@@ -79,6 +80,6 @@ object helper {
       }
       i += 1
     }
-    detections.reduceToSize(len)
+    detections.take(len)
   }
 }

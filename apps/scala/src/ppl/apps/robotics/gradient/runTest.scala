@@ -20,6 +20,7 @@ object runTest extends DeliteApplication {
     
     val bigg = new BinarizedGradientGrid(Array("coke2-40.txt", "odwalla-orange2-40.txt"))
 
+
     Delite.init = false
 
     //    val (x, y) = cokeImage.scharr()

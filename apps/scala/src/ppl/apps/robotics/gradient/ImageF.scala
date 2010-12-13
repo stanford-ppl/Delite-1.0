@@ -1,6 +1,7 @@
 package ppl.apps.robotics.gradient
 
 import ppl.delite.dsl.optiml._
+import ppl.delite.dsl.optiml.appinclude._
 
 /**
  * Created by IntelliJ IDEA.

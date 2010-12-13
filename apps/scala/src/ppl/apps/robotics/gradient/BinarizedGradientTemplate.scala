@@ -1,7 +1,7 @@
 package ppl.apps.robotics.gradient
 
 import ppl.delite.dsl.optiml._
-import collection.mutable.ArrayBuffer
+import ppl.delite.dsl.optiml.appinclude._
 
 /**
  * Created by IntelliJ IDEA.
@@ -26,7 +26,7 @@ class BinarizedGradientTemplate {
    * Holds a tighter bounding box of the object in the original image scale
    */
   var rect: Rect = null
-  var mask_list: Vector[Int] = null
+  var mask_list = Vector[Int]()
 
   /**
    * Pyramid level of the template (reduction_factor = 2^level)
@@ -41,12 +41,12 @@ class BinarizedGradientTemplate {
   /**
    * indices to use for matching (skips zeros inside binary_gradients)
    */
-  var match_list: ArrayBuffer[Int] = null
+  var match_list: Vector[Int] = null
 
   /**
    * This is a match list of list of sub-parts. Currently unused.
    */
-  var occlusions: ArrayBuffer[ArrayBuffer[Int]] = null
+  var occlusions: Vector[Vector[Int]] = null
 
   var templates: Vector[BinarizedGradientTemplate] = null
 
@@ -67,7 +67,7 @@ class BinarizedGradientTemplate {
     if (total == 0.0) {
       return -1.0f
     }
-    val num_test: Float = test.match_list.length.asInstanceOf[Float];
+    val num_test: Float = test.match_list.length.asInstanceOf[Float]
     if ((num_test / total) < match_thresh) {
       return num_test / total; //Not enough entries in the other list to be above match_thresh
     }
