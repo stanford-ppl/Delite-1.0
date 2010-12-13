@@ -27,11 +27,10 @@ class IndexVector extends IntVectorImpl {
     _start = st
     _end = en
 
-    assert(_start == 0) // temporary
     if (_start > _end) throw new IndexOutOfBoundsException
     init(true, _end-_start)
     for (i <- _start until _end){
-      _data(i) = i
+      _data(i-_start) = i
     }
     isComputed = true
   }
@@ -63,6 +62,7 @@ class IndexVector extends IntVectorImpl {
   // TODO: 1) transform block (: => A) into a fixedBlock (Int => A)
   // TODO: 2) replace call to apply(block) above with call to applyimpl(fixedBlock) here
   def apply[@specialized(Double)A](block : Int => A)(implicit pFact : DeliteProxyFactory[Vector[A]], c: ClassManifest[A]) : Vector[A] = {
+    assert(_start == 0) // temporary
     val deps = block match {
       case f: DeliteFunc => f.deps
       case _ => Seq()
