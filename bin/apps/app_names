@@ -5,6 +5,7 @@ k-means
 k-meansgpu
 k-meansbaseline
 k-means_be
+graphlbpbaseline
 lbp
 lbpbaseline
 lbpgpu
