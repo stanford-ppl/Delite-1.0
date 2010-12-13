@@ -48,6 +48,12 @@ class LBPImage(val rows: Int, val cols: Int) {
   val data = Array.fill(rows * cols)(0.0)
   val pixels = rows * cols
 
+  def copy() : LBPImage = {
+    val img = new LBPImage(rows, cols)
+    Array.copy(data, 0, img.data, 0, rows*cols)
+    img
+  }
+
   def vertid(i: Int, j: Int) = {
     assert(i < rows)
     assert(j < cols)

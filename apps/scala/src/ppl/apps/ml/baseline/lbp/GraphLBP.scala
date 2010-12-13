@@ -2,6 +2,7 @@ package ppl.apps.ml.baseline.lbp
 
 import ppl.apps.ml.baseline.lbp.Graph.{Scope, Consistency}
 import ppl.apps.ml.lbp._
+import ppl.delite.metrics.PerformanceTimer
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -61,18 +62,56 @@ object GraphLBP {
   var out_stream = new java.io.PrintStream(out_file)
 */
 
+  def print_usage = {
+    println("Usage: GraphLBP <raw image file> <cleaned image>")
+    println("Example: LBP noisy.raw pred.pgm")
+    exit(-1)
+  }
+
   def main(args: Array[String]) = {
+    if (args.length < 2) print_usage
+    val raw = args(0)
+    val out = args(1)
+
     // Generate image
+    /*
     val img = new LBPImage(rows, cols)
     img.paintSunset(colors)
     img.save("src_img.pgm")
     img.corrupt(sigma)
     img.save("noise_img.pgm")
+    */
 
-    /*val img = LBPImage.load("noisy_image.raw")
-    img.save("check_img.pgm")*/
+    // Load in a raw image that we generated from GraphLab
+    val img = LBPImage.load(raw)
 
-    // Construct graph from image
+    // Make sure we read in the raw file correctly
+    // img.save("check_img.pgm")
+
+    // 
+    val num = 10
+    for (i <- 0 until num) {
+      PerformanceTimer.start("GraphLBPbaseline")
+
+      // Clean up the image and save it
+      val cleanImg = denoise(img)
+      cleanImg.save(out)
+
+      PerformanceTimer.stop("GraphLBPbaseline")
+      PerformanceTimer.print("GraphLBPbaseline")
+    }
+
+    PerformanceTimer.save("GraphLBPbaseline")
+
+    /*out_stream.println(count)
+    out_stream.close*/
+  }
+
+  def denoise(imgIn : LBPImage) : LBPImage = {
+    // Make a copy of the image
+    val img = imgIn.copy()
+
+     // Construct graph from image
     val g = constructGraph(img, colors, sigma)
 
     if (smoothing == "laplace") {
@@ -98,11 +137,7 @@ object GraphLBP {
       }
     }
 
-    // Save the predicted image
-    img.save("pred_img.pgm")
-
-    /*out_stream.println(count)
-    out_stream.close*/
+    img
   }
 
   def bpUpdate(v: Vertex, scope: Scope[Vertex, MessageEdge]) {
