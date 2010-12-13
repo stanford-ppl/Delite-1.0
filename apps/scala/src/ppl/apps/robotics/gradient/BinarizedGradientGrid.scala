@@ -313,7 +313,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     //    printf("In detect: rows: %d, cols: %d, template_radius: %g, reduction_factor: %g\n", rows, cols, template_radius, reduction_factor);
 
     if (locations.length == 0) {
-          for (y <- 5 until rows - 5) {
+      for (y <- 5 until rows - 5) {
         for (x <- 5 until cols - 5) {
           val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
           for (j <- 0 until templates.length) {
