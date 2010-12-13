@@ -73,7 +73,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
 
   readModels()
 
-  
+
   /**
      * Loads pre-trained models
      */
@@ -132,7 +132,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
       xend = cols
     }
 
-    tpl.hist = ArrayBuffer.fill(8)(0)
+    tpl.hist = Vector[Float](8)
     var cnt = 0
 
     //Fill the binary _gradients
@@ -172,7 +172,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     tpl.rect = new Rect(0, 0, roi.width, roi.height)
 
     // set mask
-    tpl.mask_list = ArrayBuffer.fill(mask.rows * mask.cols)(0)
+    tpl.mask_list = Vector[Int](mask.rows * mask.cols)
     var idx = 0
     for (y <- 0 until mask.rows) {
       for (x <- 0 until mask.cols) {
@@ -225,7 +225,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
       xend = cols
     }
 
-    tpl.hist = ArrayBuffer.fill(8)(0)
+    tpl.hist = Vector[Float](8)
 //    var cnt = 0
 
     //Fill the binary _gradients
@@ -257,22 +257,20 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     tpl
   }
 
-  def detect2(img: Image, level: Int, pyr: BinarizedGradientPyramid, locations: ArrayBuffer[Point2i], templates: Vector[BinarizedGradientTemplate], detections: ArrayBuffer[BiGGDetection], template_radius: Int, accept_threshold: Float, accept_threshold_decay: Float): Unit = {
+  def detect2(img: Image, level: Int, pyr: BinarizedGradientPyramid, locations: Vector[Point2i], templates: Vector[BinarizedGradientTemplate], detections: Vector[BiGGDetection], template_radius: Int, accept_threshold: Float, accept_threshold_decay: Float): Unit = {
     println("Detect on level: " + level)
     val reduction_factor = (1 << level)
     val newRadius = template_radius // = template_radius / reduction_factor
     // NOTE: Likely due to lack of full-scale database
 
-    val crt_detections = new ArrayBuffer[BiGGDetection]()
-
-    detect3(pyr.getIndex(level), locations, templates, crt_detections, newRadius, level, accept_threshold)
+    val crt_detections = detect3(pyr.getIndex(level), locations, templates, newRadius, level, accept_threshold)
 
     //	printf("Before nms, detections: %d\n", crt_detections.size());
     println("Detections: " + crt_detections.length)
 
     if (level > pyr.start_level) {
       for (i <- 0 until crt_detections.length) {
-        val crt_locations = new ArrayBuffer[Point2i]()
+        val crt_locations = Vector[Point2i]()
 
         val dir = Array(Array(-1, -1, -1, 0, 0, 0, 1, 1, 1), Array(-1, 0, 1, -1, 0, 1, -1, 0, 1))
 
@@ -291,7 +289,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     }
   }
 
-  def dist(a: ArrayBuffer[Float], b: ArrayBuffer[Float]): Float = {
+  def dist(a: Vector[Float], b: Vector[Float]): Float = {
     var result: Float = 0
     for (i <- 0 until a.length) {
       result += (a(i) - b(i)) * (a(i) - b(i))
@@ -304,90 +302,43 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
    * @param gradientSummary
    * @param detections
    */
-  def detect3(gradSummary: Image, locations: ArrayBuffer[Point2i], templates: Vector[BinarizedGradientTemplate], detections: ArrayBuffer[BiGGDetection], template_radius: Int, level: Int, accept_threshold: Float) = {
-    val rows = gradSummary.rows
-    val cols = gradSummary.cols
-
-    val reduction_factor = (1 << level)
-
-    //    printf("In detect: rows: %d, cols: %d, template_radius: %g, reduction_factor: %g\n", rows, cols, template_radius, reduction_factor);
-
+  def detect3(gradSummary: Image, locations: Vector[Point2i], templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
     if (locations.length == 0) {
-      for (y <- 5 until rows - 5) {
-        for (x <- 5 until cols - 5) {
-          val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
-          for (j <- 0 until templates.length) {
-            val res = templates(j).score(crt_template, accept_threshold, match_table, match_method_)
-            if (res > accept_threshold) {
-              //        				printf("Level: %d, score: %g\n", level, res);
-              val detection = new BiGGDetection()
-              val bbox = templates(j).rect
-
-              detection.roi = new Rect((reduction_factor * x - bbox.width / 2).asInstanceOf[Int], (reduction_factor * y - bbox.height / 2).asInstanceOf[Int], bbox.width, bbox.height)
-              detection.score = res
-              detection.index = j
-              detection.x = x
-              detection.y = y
-              detection.tpl = templates(j)
-              detection.crt_tpl = crt_template
-
-              detections += detection
-            }
-          }
+      (5 :: gradSummary.rows - 5).flatMap { y =>
+        (5 :: gradSummary.cols - 5).flatMap { x =>
+          searchTemplates(gradSummary, x, y, template_radius, level, accept_threshold, templates)
         }
       }
-//      val detectionsList = (5 :: rows - 5).flatMap { y =>
-//        (5 :: cols - 5).flatMap { x =>
-//          val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
-//          templates.indices.flatMap { j =>
-//              val res = templates(j).score(crt_template, accept_threshold, match_table, match_method_)
-//              if (res > accept_threshold) {
-//                //        				printf("Level: %d, score: %g\n", level, res);
-//                val detection = new BiGGDetection()
-//                val bbox = templates(j).rect
-//
-//                detection.roi = new Rect((reduction_factor * x - bbox.width / 2).asInstanceOf[Int], (reduction_factor * y - bbox.height / 2).asInstanceOf[Int], bbox.width, bbox.height)
-//                detection.score = res
-//                detection.index = j
-//                detection.x = x
-//                detection.y = y
-//                detection.tpl = templates(j)
-//                detection.crt_tpl = crt_template
-//
-//                detection
-//              }
-//              else {
-//                Nil
-//              }
-//          }
-//        }
-//      }
-//      detections ++= detectionsList
     }
     else {
-      for (i <- 0 until locations.length) {
-        val x = locations(i).x
-        val y = locations(i).y
-        val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
-        for (j <- 0 until templates.length) {
-          val res = templates(j).score(crt_template, accept_threshold, match_table, match_method_)
-          if (res > accept_threshold) {
-            //    				printf("Level: %d, score: %g\n", level, res);
-            val detection = new BiGGDetection()
-            val bbox = templates(j).rect
+      locations.flatMap{loc => searchTemplates(gradSummary, loc.x, loc.y, template_radius, level, accept_threshold, templates)}
+    }
+  }
 
-            detection.roi = new Rect((reduction_factor * x - bbox.width / 2).asInstanceOf[Int], (reduction_factor * y - bbox.height / 2).asInstanceOf[Int], bbox.width, bbox.height)
-            detection.score = res
-            detection.index = j
-            detection.x = x
-            detection.y = y
-            detection.tpl = templates(j)
-            detection.crt_tpl = crt_template
+  def searchTemplates(gradSummary: Image, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
+    val reduction_factor = (1 << level)
+    val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
+    templates.indices.flatMap{
+      j =>
+        val res = templates(j).score(crt_template, accept_threshold, match_table, match_method_)
+        if (res > accept_threshold) {
+          println("Level: " + level + ", score: " + res)
+          val detection = new BiGGDetection()
+          val bbox = templates(j).rect
 
-            detections += detection
-          }
+          detection.roi = new Rect((reduction_factor * x - bbox.width / 2).asInstanceOf[Int], (reduction_factor * y - bbox.height / 2).asInstanceOf[Int], bbox.width, bbox.height)
+          detection.score = res
+          detection.index = j
+          detection.x = x
+          detection.y = y
+          detection.tpl = templates(j)
+          detection.crt_tpl = crt_template
+
+          Vector[BiGGDetection](detection)
         }
-      }
+        else {
+          Vector[BiGGDetection]()
+        }
     }
   }
 
@@ -422,8 +373,8 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     PerformanceTimer.start("detectLoop")
     all_templates.foreach {
       root_templates =>
-        val detections = new ArrayBuffer[BiGGDetection]()
-        val everywhere = new ArrayBuffer[Point2i]()
+        val detections = Vector[BiGGDetection]()
+        val everywhere = Vector[Point2i]()
         println("Using " + root_templates.length + " templates")
         detect2(image, pyr.start_level + pyr.levels - 1, pyr, everywhere, root_templates, detections, template_radius_, accept_threshold_, accept_threshold_decay_)
 

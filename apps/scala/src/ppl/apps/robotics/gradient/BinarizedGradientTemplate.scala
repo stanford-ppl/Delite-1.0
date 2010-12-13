@@ -26,7 +26,7 @@ class BinarizedGradientTemplate {
    * Holds a tighter bounding box of the object in the original image scale
    */
   var rect: Rect = null
-  var mask_list: ArrayBuffer[Int] = null
+  var mask_list: Vector[Int] = null
 
   /**
    * Pyramid level of the template (reduction_factor = 2^level)
@@ -50,7 +50,7 @@ class BinarizedGradientTemplate {
 
   var templates: Vector[BinarizedGradientTemplate] = null
 
-  var hist: ArrayBuffer[Float] = null
+  var hist: Vector[Float] = null
 
   /**
    * Score this template against another template
