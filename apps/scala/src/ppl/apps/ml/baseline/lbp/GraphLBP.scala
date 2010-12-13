@@ -46,8 +46,8 @@ object GraphLBP {
   var colors = 5
   var damping = 0.1
   var bound = 1E-15
-  var rows = 50
-  var cols = 50
+  var rows = 100
+  var cols = 100
   var sigma = 2
   var lambda = 10
   var smoothing = "laplace"
@@ -63,39 +63,41 @@ object GraphLBP {
 */
 
   def print_usage = {
-    println("Usage: GraphLBP <raw image file> <cleaned image>")
-    println("Example: LBP noisy.raw pred.pgm")
+    println("Usage: GraphLBP <rows> <cols>")
+    println("Example: GraphLBP 100 100")
     exit(-1)
   }
 
   def main(args: Array[String]) = {
-    if (args.length < 2) print_usage
-    val raw = args(0)
-    val out = args(1)
+    // rows and cols arguments
+    try {
+      if(args.length > 0) rows = java.lang.Integer.parseInt(args(0))
+      if(args.length > 1) cols = java.lang.Integer.parseInt(args(1))
+    }
+    catch {
+      case _: Exception => print_usage
+    }
 
     // Generate image
-    /*
     val img = new LBPImage(rows, cols)
     img.paintSunset(colors)
-    img.save("src_img.pgm")
+    img.save("src.pgm")
     img.corrupt(sigma)
-    img.save("noise_img.pgm")
-    */
+    img.save("noise.pgm")
 
     // Load in a raw image that we generated from GraphLab
-    val img = LBPImage.load(raw)
+    //val img = LBPImage.load(raw)
 
     // Make sure we read in the raw file correctly
     // img.save("check_img.pgm")
 
-    // 
     val num = 10
     for (i <- 0 until num) {
       PerformanceTimer.start("GraphLBPbaseline")
 
       // Clean up the image and save it
       val cleanImg = denoise(img)
-      cleanImg.save(out)
+      cleanImg.save("pred.pgm")
 
       PerformanceTimer.stop("GraphLBPbaseline")
       PerformanceTimer.print("GraphLBPbaseline")
