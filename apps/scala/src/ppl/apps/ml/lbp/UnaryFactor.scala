@@ -98,11 +98,14 @@ class UnaryFactor(var v: Int, val arity: Int) {
 
   // this(x) = sum_y fact(x,y) * other(y)
   def convolve(bin_fact: BinaryFactor, other: UnaryFactor): Unit = {
-    for (x <- 0 until arity) {
+    var x = 0
+    while (x < arity) {
       var sum = 0.0
 
-      for (y <- 0 until other.arity) {
+      var y = 0
+      while (y < arity) {
         sum += Math.exp(bin_fact.data(bin_fact.index4(v, x, other.v, y)) + other.data(y))
+        y += 1
       }
 
       assert(!(sum < 0))
@@ -111,6 +114,7 @@ class UnaryFactor(var v: Int, val arity: Int) {
         sum = Double.MinValue
 
       data(x) = Math.log(sum)
+      x += 1
     }
   }
 
