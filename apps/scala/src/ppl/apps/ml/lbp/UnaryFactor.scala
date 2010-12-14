@@ -31,8 +31,11 @@ class UnaryFactor(var v: Int, val arity: Int) {
   }
 
   def uniform(value: Double = 0.0) = {
-    for (asg <- 0 until arity)
-      logP(asg) = value;
+    var asg = 0
+    while (asg < arity) {
+      data(asg) = value;
+      asg += 1
+    }
   }
 
   def normalize() = {
@@ -42,16 +45,21 @@ class UnaryFactor(var v: Int, val arity: Int) {
 
     // Scale and compute normalizing constant
     var Z = 0.0
-    for (asg <- 0 until arity) {
-      Z += Math.exp(logP(asg) - max)
-      logP(asg) -= max
+
+    var asg = 0
+    while (asg < arity) {
+      Z += Math.exp(data(asg) - max)
+      data(asg) -= max
+      asg += 1
     }
 
     assert(Z > 0)
     var logZ = Math.log(Z)
 
-    for (asg <- 0 until arity) {
-      logP(asg) -= logZ
+    asg = 0
+    while (asg < arity) {
+      data(asg) -= logZ
+      asg += 1
     }
   }
 
@@ -59,8 +67,10 @@ class UnaryFactor(var v: Int, val arity: Int) {
   def times(other: UnaryFactor) = {
     assert(arity == other.arity)
 
-    for (asg <- 0 until arity) {
-      logP(asg) += other.logP(asg)
+    var asg = 0
+    while (asg < arity) {
+      data(asg) += other.data(asg)
+      asg += 1
     }
   }
 
@@ -68,8 +78,10 @@ class UnaryFactor(var v: Int, val arity: Int) {
   def plus(other: UnaryFactor) = {
     assert(arity == other.arity)
 
-    for (asg <- 0 until arity) {
-      logP(asg) = Math.log(Math.exp(logP(asg)) + Math.exp(other.logP(asg)))
+    var asg = 0
+    while (asg < arity) {
+      data(asg) = Math.log(Math.exp(data(asg)) + Math.exp(other.data(asg)))
+      asg += 1
     }
   }
 
@@ -77,8 +89,10 @@ class UnaryFactor(var v: Int, val arity: Int) {
   def divide(other: UnaryFactor) = {
     assert(arity == other.arity)
 
-    for (asg <- 0 until arity) {
-      logP(asg) -= other.logP(asg)
+    var asg = 0
+    while (asg < arity) {
+      data(asg) -= other.data(asg)
+      asg += 1
     }
   }
 
@@ -88,7 +102,7 @@ class UnaryFactor(var v: Int, val arity: Int) {
       var sum = 0.0
 
       for (y <- 0 until other.arity) {
-        sum += Math.exp(bin_fact.logP(v, x, other.v, y) + other.logP(y))
+        sum += Math.exp(bin_fact.data(bin_fact.index4(v, x, other.v, y)) + other.data(y))
       }
 
       assert(!(sum < 0))
@@ -96,15 +110,17 @@ class UnaryFactor(var v: Int, val arity: Int) {
       if (sum == 0)
         sum = Double.MinValue
 
-      logP(x) = Math.log(sum)
+      data(x) = Math.log(sum)
     }
   }
 
   def condition(bin_fact: BinaryFactor, asg: Int) = {
     val other_var = if (v == bin_fact.v1) bin_fact.v2 else bin_fact.v1
 
-    for (x <- 0 until arity) {
-      logP(x) += bin_fact.logP(v, x, other_var, asg)
+    var x = 0
+    while (x < arity) {
+      data(x) += bin_fact.data(bin_fact.index4(v, x, other_var, asg))
+      x += 1
     }
   }
 
@@ -115,9 +131,11 @@ class UnaryFactor(var v: Int, val arity: Int) {
       assert(damping >= 0)
       assert(damping < 1)
 
-      for (asg <- 0 until arity) {
-        logP(asg) = Math.log(damping * Math.exp(other.logP(asg)) +
-                (1.0 - damping) * Math.exp(logP(asg)))
+      var asg = 0
+      while (asg < arity) {
+        data(asg) = Math.log(damping * Math.exp(other.data(asg)) +
+                (1.0 - damping) * Math.exp(data(asg)))
+        asg += 1
       }
     }
   }
@@ -126,9 +144,11 @@ class UnaryFactor(var v: Int, val arity: Int) {
   def residual(other: UnaryFactor): Double = {
     assert(arity == other.arity)
     var residual = 0.0
-    for (asg <- 0 until arity) {
-      residual += Math.abs(Math.exp(logP(asg)) -
-              Math.exp(other.logP(asg)))
+    var asg = 0
+    while (asg < arity) {
+      residual += Math.abs(Math.exp(data(asg)) -
+              Math.exp(other.data(asg)))
+      asg += 1
     }
     residual / arity
   }
@@ -136,12 +156,15 @@ class UnaryFactor(var v: Int, val arity: Int) {
   // Max assignment
   def max_asg() = {
     var max_asg = 0;
-    var max_value = logP(0);
-    for (asg <- 0 until arity) {
-      if (logP(asg) > max_value) {
-        max_value = logP(asg)
+    var max_value = data(0);
+
+    var asg = 0
+    while (asg < arity) {
+      if (data(asg) > max_value) {
+        max_value = data(asg)
         max_asg = asg
       }
+      asg += 1
     }
 
     max_asg
@@ -151,15 +174,17 @@ class UnaryFactor(var v: Int, val arity: Int) {
     var sum = 0.0
     var s2 = 0.0
 
-    for (asg <- 0 until arity) {
-      sum += asg * Math.exp(logP(asg))
-      s2 += Math.exp(logP(asg))
+    var asg = 0
+    while (asg < arity) {
+      sum += asg * Math.exp(data(asg))
+      s2 += Math.exp(data(asg))
+      asg += 1
     }
 
     sum / s2
   }
 
-  override def toString() : String = {
+  override def toString(): String = {
     v + " " + data.mkString(" ")
   }
 }

@@ -16,23 +16,27 @@ package ppl.apps.ml.lbp
 class BinaryFactor(val v1: Int = 0, val arity1: Int = 0, val v2: Int = 0, val arity2: Int = 0) {
   val data = Array.fill(arity1 * arity2)(0.0)
 
-  val logP = new {
-    def index4(x1: Int, asg1: Int, x2: Int, asg2: Int): Int = {
-      assert(asg1 < arity1)
-      assert(asg2 < arity2)
+  def index4(x1: Int, asg1: Int, x2: Int, asg2: Int): Int = {
+    assert(asg1 < arity1)
+    assert(asg2 < arity2)
 
-      // Not symmetric
-      if (v1 != v2) {
-        assert((x1 == v1 && x2 == v2) || (x2 == v1 && x1 == v2))
-        // Swap factors
-        if (x1 == v2 && x2 == v1) {
-          return asg2 + asg1 * arity1
-        }
+    // Not symmetric
+    if (v1 != v2) {
+      assert((x1 == v1 && x2 == v2) || (x2 == v1 && x1 == v2))
+      // Swap factors
+      if (x1 == v2 && x2 == v1) {
+        return asg2 + asg1 * arity1
       }
-
-      asg1 + asg2 * arity1
     }
-    
+
+    asg1 + asg2 * arity1
+  }
+
+  def index2(asg1: Int, asg2: Int) = {
+    asg1 + asg2 * arity1
+  }
+
+  val logP = new {
     def apply(x1: Int, asg1: Int, x2: Int, asg2: Int) = {
       data(index4(x1, asg1, x2, asg2))
     }
@@ -69,7 +73,7 @@ class BinaryFactor(val v1: Int = 0, val arity1: Int = 0, val v2: Int = 0, val ar
     }
   }
 
-  override def toString() : String = {
+  override def toString(): String = {
     (0 until arity1).map((i) => {
       (0 until arity2).map((j) => logP(i, j)).mkString(" ")
     }).mkString("\n")
