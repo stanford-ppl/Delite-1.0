@@ -1,2 +1,4 @@
 ext_libs
 cnative/lib
+*.class
+*.times
