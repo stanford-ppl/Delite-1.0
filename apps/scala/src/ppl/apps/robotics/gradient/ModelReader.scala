@@ -37,7 +37,7 @@ object ModelReader {
     temp = file.readLine().trim.split(" ")
     if (temp(0) != "Gradients:") throw new RuntimeException("Illegal data format")
     val gradientsSize = Integer.parseInt(temp(1))
-    val gradients = Array.fill(gradientsSize)(0)
+    val gradients = Vector[Int](gradientsSize)
     val gradientsString = file.readLine().trim.split(" ")
     for (i <- 0 until gradientsSize) {
       gradients(i) = Integer.parseInt(gradientsString(i))

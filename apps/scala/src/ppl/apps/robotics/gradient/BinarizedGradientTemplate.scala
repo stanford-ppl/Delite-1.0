@@ -36,7 +36,7 @@ class BinarizedGradientTemplate {
   /**
    * The list of gradients in the template
    */
-  var binary_gradients: Array[Int] = null
+  var binary_gradients: Vector[Int] = null
 
   /**
    * indices to use for matching (skips zeros inside binary_gradients)

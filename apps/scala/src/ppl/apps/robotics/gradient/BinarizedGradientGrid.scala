@@ -15,7 +15,7 @@ import ppl.delite.core.appinclude._
  * To change this template use File | Settings | File Templates.
  */
 
-class BinarizedGradientGrid(modelFilenames: Array[String]) {
+class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   val match_table = Matrix[Int](256, 256)
 
   //A somewhat inelegant way to create a unsigned char 256x256 look up table for cosine matching
@@ -23,8 +23,8 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
   // Each adjacent position, whether right or left is a 22.5 degree mismatch since I don't consider
   // contrast (gradients go only from 0 to 180 degrees) and I binarize into bytes (180/8 = 22.5)
   // This table will be used if match_type = 1, else we'll use anding (and just disregard this table)
-  for (d1 <- 0 until 256) {
-    for (d2 <- 0 until 256) {
+  (0 :: 256).map { d1 =>
+    (0 :: 256).map { d2 =>
       if ((d1 == 0) || (d2 == 0)) {
         match_table(d1, d2) = 0
       }
@@ -101,7 +101,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     val tpl = new BinarizedGradientTemplate()
     tpl.radius = r
     tpl.level = level
-    tpl.binary_gradients = Array.fill(span * span)(0) //Create the template
+    tpl.binary_gradients = Vector[Int](span * span) //Create the template
     tpl.match_list = Vector[Int]()
 
     //Bear with me, we have to worry a bit about stepping off the image boundaries:
@@ -165,7 +165,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
     val tpl = new BinarizedGradientTemplate()
     tpl.radius = r
     tpl.level = level
-    tpl.binary_gradients = Array.fill(span * span)(0) //Create the template
+    tpl.binary_gradients = Vector[Int](span * span) //Create the template
     tpl.match_list = Vector[Int]()
 
     tpl.rect = new Rect(0, 0, roi.width, roi.height)
@@ -256,7 +256,7 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
       for (i <- 0 until crt_detections.length) {
         val crt_locations = Vector[Point2i]()
 
-        val dir = Array(Array(-1, -1, -1, 0, 0, 0, 1, 1, 1), Array(-1, 0, 1, -1, 0, 1, -1, 0, 1))
+        val dir = Matrix[Int](Vector[Int](-1, -1, -1, 0, 0, 0, 1, 1, 1), Vector[Int](-1, 0, 1, -1, 0, 1, -1, 0, 1))
 
         val x = crt_detections(i).x
         val y = crt_detections(i).y
@@ -285,6 +285,18 @@ class BinarizedGradientGrid(modelFilenames: Array[String]) {
    * @param detections
    */
   def detect3(gradSummary: Image, locations: Vector[Point2i], templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
+//    if (locations.length == 0) {
+//      (5 :: gradSummary.rows - 5).flatMap { y =>
+//        (5 :: gradSummary.cols - 5).flatMap { x =>
+//          searchTemplates(gradSummary, x, y, template_radius, level, accept_threshold, templates)
+//        }
+//      }
+//    }
+//    else {
+//      locations.flatMap{loc => searchTemplates(gradSummary, loc.x, loc.y, template_radius, level, accept_threshold, templates)}
+//    }
+
+    def detections = Vector[BiGGDetection]()
     if (locations.length == 0) {
       (5 :: gradSummary.rows - 5).flatMap { y =>
         (5 :: gradSummary.cols - 5).flatMap { x =>
@@ -588,8 +600,8 @@ def endTraining(name: String) = {
     }
     //Now do non-max suppression. NOTE. Each pixel location contains just one orientation at this point
     val cleanedGradient = new Image(rows, cols)
-    val counts = Array.fill(9)(0) //9 places since we must also count zeros ... and ignore them.  That means that bit 1 falls into counts[1], 10 into counts[2] etc
-    val index = Array.fill(255)(0) //This is just a table to translate 0001->1, 0010->2, 0100->3, 1000->4 and so on
+    val counts = Vector[Int](9) //9 places since we must also count zeros ... and ignore them.  That means that bit 1 falls into counts[1], 10 into counts[2] etc
+    val index = Vector[Int](255) //This is just a table to translate 0001->1, 0010->2, 0100->3, 1000->4 and so on
     index(0) = 0 //Fill out this table Index to increments counts, counts how many times a 1 has been shifted
     index(1) = 1
     index(2) = 2
@@ -599,7 +611,7 @@ def endTraining(name: String) = {
     index(32) = 6
     index(64) = 7
     index(128) = 8
-    val sft = Array.fill(9)(0) //OK, bear with me now. This table will translate from offset back to shift: 1->0001, 2->0010, 3->0100 and so on.
+    val sft = Vector[Int](9) //OK, bear with me now. This table will translate from offset back to shift: 1->0001, 2->0010, 3->0100 and so on.
     var mask = 1
     for (i <- 1 until 9) {
       sft(i) = mask

@@ -16,22 +16,17 @@ object runTest extends DeliteApplication {
   def run(args: Array[String]) = {
 
     Delite.init = true
-    val cokeImage = Image.load("cokeImage.dat")
-    
-    val bigg = new BinarizedGradientGrid(Array("coke2-40.txt", "odwalla-orange2-40.txt"))
+    val image = Image.load(args(0))
+    val templateFiles = Vector[String]()
+    new java.io.File(args(1)).listFiles.map { file => templateFiles += file.getPath()}
 
-
+    val bigg = new BinarizedGradientGrid(templateFiles)
     Delite.init = false
-
-    //    val (x, y) = cokeImage.scharr()
-    //    x.data.pprint
-    //    y.data.pprint
-
 
     var numTimes = 10
     for (i <- 0 until numTimes) {
       PerformanceTimer.start("Gradient")
-      bigg.detectMain(cokeImage)
+      bigg.detectMain(image)
       PerformanceTimer.stop("Gradient")
       PerformanceTimer.print("Gradient")
     }
