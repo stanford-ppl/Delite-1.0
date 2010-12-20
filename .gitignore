@@ -2,3 +2,8 @@ ext_libs
 cnative/lib
 *.class
 *.times
+*.iml
+.idea
+nativeerr.txt
+nativeout.txt
+data
