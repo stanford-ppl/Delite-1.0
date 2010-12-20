@@ -1124,6 +1124,7 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
 
   def flatMap[B](f: T => Vector[B])(implicit pfact: Vector.ProxyFactory[B], c: ClassManifest[B]) : Vector[B] = {
     val pieces = this map {a => f(a)}
+    // TODO: Use reduce to run flatten?  May actually be slower in some cases
     Vector.flatten(pieces)
   }
 
