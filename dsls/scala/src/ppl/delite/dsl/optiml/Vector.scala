@@ -589,7 +589,7 @@ object Vector {
     }
  }
 
-  protected[optiml] case class OP_flatMap[A,B](v: Vector[A], f: A => Vector[B])
+  protected[optiml] case class OP_flatMap_single[A,B](v: Vector[A], f: A => Vector[B])
     (implicit pfact: Vector.ProxyFactory[B], m : ClassManifest[B])
     extends DeliteOP_SingleTask[Vector[B]] {
 
@@ -1123,8 +1123,14 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
  }
 
   def flatMap[B](f: T => Vector[B])(implicit pfact: Vector.ProxyFactory[B], c: ClassManifest[B]) : Vector[B] = {
-    run(OP_flatMap(this, f))
+    val pieces = this map {a => f(a)}
+    Vector.flatten(pieces)
   }
+
+  def flatMapSequential[B](f: T => Vector[B])(implicit pfact: Vector.ProxyFactory[B], c: ClassManifest[B]) : Vector[B] = {
+    run(OP_flatMap_single(this, f))
+  }
+
 
   def contains(x: T) : Boolean = {
     var i = 0

@@ -242,12 +242,17 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   }
 
   def detect2(img: Image, level: Int, pyr: BinarizedGradientPyramid, locations: Vector[Point2i], templates: Vector[BinarizedGradientTemplate], detections: Vector[BiGGDetection], template_radius: Int, accept_threshold: Float, accept_threshold_decay: Float): Unit = {
-    println("Detect on level: " + level)
+//    println("Detect on level: " + level)
     val reduction_factor = (1 << level)
     val newRadius = template_radius // = template_radius / reduction_factor
     // NOTE: Likely due to lack of full-scale database
 
+    PerformanceTimerAggregate.start("detect3")
     val crt_detections = detect3(pyr.getIndex(level), locations, templates, newRadius, level, accept_threshold)
+    PerformanceTimerAggregate.stop("detect3")
+    PerformanceTimerAggregate.start("detect3p")
+    crt_detections.force
+    PerformanceTimerAggregate.stop("detect3p")
 
     //	printf("Before nms, detections: %d\n", crt_detections.size());
     println("Detections: " + crt_detections.length)
@@ -285,18 +290,6 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
    * @param detections
    */
   def detect3(gradSummary: Image, locations: Vector[Point2i], templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
-//    if (locations.length == 0) {
-//      (5 :: gradSummary.rows - 5).flatMap { y =>
-//        (5 :: gradSummary.cols - 5).flatMap { x =>
-//          searchTemplates(gradSummary, x, y, template_radius, level, accept_threshold, templates)
-//        }
-//      }
-//    }
-//    else {
-//      locations.flatMap{loc => searchTemplates(gradSummary, loc.x, loc.y, template_radius, level, accept_threshold, templates)}
-//    }
-
-    def detections = Vector[BiGGDetection]()
     if (locations.length == 0) {
       (5 :: gradSummary.rows - 5).flatMap { y =>
         (5 :: gradSummary.cols - 5).flatMap { x =>
@@ -305,8 +298,20 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
       }
     }
     else {
+      println("Using locations vector")
       locations.flatMap{loc => searchTemplates(gradSummary, loc.x, loc.y, template_radius, level, accept_threshold, templates)}
     }
+
+//    def detections = Vector[BiGGDetection]()
+//    if (locations.length == 0) {
+//      (5 :: gradSummary.rows - 5, 5 :: gradSummary.cols - 5).aggregate { (y, x) =>  // RETURNS Option[T]
+//          searchTemplates(gradSummary, x, y, template_radius, level, accept_threshold, templates, detections)
+//      }
+//    }
+//    else {
+//      locations.map{loc => searchTemplates(gradSummary, loc.x, loc.y, template_radius, level, accept_threshold, templates, detections)}
+//    }
+//    detections
   }
 
   def searchTemplates(gradSummary: Image, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
