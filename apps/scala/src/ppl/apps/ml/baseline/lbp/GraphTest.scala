@@ -1,7 +1,5 @@
 package ppl.apps.ml.baseline.lbp
 
-import ppl.apps.ml.baseline.lbp.Graph.Scope
-
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
  * last modified: 12/05/2010
@@ -27,15 +25,15 @@ object GraphTest {
     g.addEdge(es(0), vs(0), vs(1))
     g.addEdge(es(1), vs(1), vs(2))
 
-    def updateFunction(v: TestVertex, scope: Scope[TestVertex, TestEdge]) : Unit = {
+    def updateFunction(v: TestVertex, scope: Graph[TestVertex, TestEdge]#Scope) : Unit = {
        v.value += 1;
 
       if(v.value < 3) {
-        scope.enqueueUpdateFunctionVertex(Graph.Consistency.Auto, v) (updateFunction)
+        scope.addTask(Graph.Consistency.Auto, v)
       }
     }
 
-    Graph.runUpdateFunction(g, Graph.Consistency.Auto) (updateFunction)
+    g.updateAll(Graph.Consistency.Auto) (updateFunction)
 
     val values = g.vertexSet.toList map {_.value}
     println(values)

@@ -2,7 +2,7 @@ package ppl.delite.metrics
 
 import collection.mutable.HashMap
 import java.io.{BufferedWriter, File, PrintWriter, FileWriter}
-import java.util.Vector
+import scala.collection.mutable.ArrayBuffer
 import ppl.delite.core.Config
 
 /**
@@ -12,11 +12,11 @@ import ppl.delite.core.Config
 object PerformanceTimer
 {
   val currentTimer = new HashMap[String, Long]
-  val times = new HashMap[String, Vector[Double]]
+  val times = new HashMap[String, ArrayBuffer[Double]]
 
   def start(component: String, printMessage: Boolean = true) {
     if (!times.contains(component)) {
-      times += component -> new Vector[Double]()
+      times += component -> new ArrayBuffer[Double]()
     }
     if (printMessage) println("[METRICS]: Timing " + component + " #" + times(component).size + " started")
     currentTimer += component -> System.nanoTime
@@ -24,8 +24,19 @@ object PerformanceTimer
 
   def stop(component: String, printMessage: Boolean = true) {
     val x = (System.nanoTime - currentTimer(component)) / 1000000000.0
-    times(component).add(x)    
+    times(component) += x
     if (printMessage) println("[METRICS]: Timing " + component + " #" + (times(component).size - 1) + " stopped")
+  }
+
+  def summarize(component: String) {
+    val total = times(component).toList.reduceLeft[Double](_+_)
+    println("[METRICS]: total time for component " + component + ": " + total)
+  }
+
+  def clearAll() {
+    for((k,v) <- times) {
+      v.clear
+    }
   }
 
   def print(component: String) {
@@ -35,7 +46,7 @@ object PerformanceTimer
 //        val timeString = times(component).get(i) formatted ("%.6f") + "s"
 //        println("[METRICS]:     " + timeString)
 //      }
-      val timeString = times(component).lastElement formatted ("%.6f") + "s"
+      val timeString = times(component).last formatted ("%.6f") + "s"
       println("[METRICS]: Latest time for component " + component + ": " + timeString)
     }
     catch {
@@ -56,7 +67,7 @@ object PerformanceTimer
       var file: String = new File("./").getCanonicalPath + "/" + component + ".p" + procstring + ".times"
       val writer = new PrintWriter(new BufferedWriter(new FileWriter(file, false)))
       for (i <- 0 until times(component).size) {
-        writer.println(times(component).get(i) formatted ("%.10f"))
+        writer.println(times(component)(i) formatted ("%.10f"))
       }
       writer.close()
     }

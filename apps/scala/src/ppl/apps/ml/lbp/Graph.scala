@@ -1,8 +1,8 @@
-package ppl.apps.ml.baseline.lbp
+package ppl.apps.ml.lbp
 
 import collection.Set
 import collection.mutable.{ArrayBuffer, Map}
-import ppl.delite.dsl.optiml.{FifoScheduler, Scheduler}
+import ppl.delite.dsl.optiml.{Scheduler, FifoScheduler}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -34,7 +34,7 @@ trait Graph[V, E] {
 
   def adjacent(a: V, b: V): Boolean
 
-  def neighbors(a: V): Set[V]
+  def neighborsOf(a: V): Set[V]
 
   def edgesOf(a: V): Set[E]
 
@@ -42,13 +42,14 @@ trait Graph[V, E] {
 
   def containsVertex(v: V): Boolean
 
-  class Scope(v: V, g: Graph[V, E], f : (V, Scope) => Unit, s: Scheduler[V]) {
+  class Vertex(v: V) {
     val data = v
     var edgeAccess = false
     var neighborAccess = false
+    val tasks = new ArrayBuffer[V]
 
-    val es = g.edgesOf(v)
-    val nbrs = g.neighbors(v)
+    val es = edgesOf(v)
+    val nbrs = neighborsOf(v)
 
     def edges = {
       edgeAccess = true
@@ -60,20 +61,23 @@ trait Graph[V, E] {
       nbrs
     }
 
-    def addTask(c: Graph.Consistency.Consistency, v: V) {
-      s.addTask(v)
+    def addTask(v: V) {
+      tasks += v
     }
   }
 
-  def updateAll(c: Graph.Consistency.Consistency)(f: (V, Scope) => Unit) {
-    val sched = new FifoScheduler[V]
+  def untilConverged(c: Graph.Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V])(f: (Vertex) => Unit) {
     sched.addTasks(vertexList)
 
     while (sched.hasTask) {
-      val v = sched.getTask()
+      val vertexData = sched.getTask()
 
-      val scope = new Scope(v, this, f, sched)
-      f(v, scope)
+      val vertex = new Vertex(vertexData)
+      f(vertex)
+
+      if(vertex.tasks.size > 0) {
+        sched.addTasks(vertex.tasks)
+      }
     }
   }
 }
@@ -96,7 +100,7 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V, E] {
 
   def edgeSet() = edge_map.keySet
 
-  def neighbors(v: V) = {
+  def neighborsOf(v: V) = {
     if (!vertex_edge_list.contains(v)) {
       Set()
     }
@@ -169,7 +173,7 @@ class DirectedGraphImpl[V, E] extends DirectedGraph[V, E] {
     }
   }
 
-  def neighbors(v: V) = {
+  def neighborsOf(v: V) = {
     if (!out_edge_list.contains(v)) {
       Set()
     }
