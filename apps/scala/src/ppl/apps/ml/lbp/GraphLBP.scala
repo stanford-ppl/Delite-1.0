@@ -2,10 +2,11 @@ package ppl.apps.ml.lbp
 
 import ppl.delite.dsl.optiml.MessageGraph
 import ppl.delite.dsl.optiml.Graph.{Consistency}
+import ppl.delite.core.{Delite, DeliteApplication}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
- * last modified: 12/06/2010
+ * last modified: 12/27/2010
  *
  * Pervasive Parallelism Laboratory (PPL)
  * Stanford University
@@ -18,7 +19,7 @@ class EdgeData(var message: UnaryFactor, var old_message: UnaryFactor) {
 }
 class VertexData(var potential: UnaryFactor, var belief: UnaryFactor)
 
-object GraphLBP {
+object GraphLBP extends DeliteApplication {
   var colors = 5
   var damping = 0.1
   var bound = 1E-15
@@ -44,7 +45,7 @@ object GraphLBP {
     exit(-1)
   }
 
-  def main(args: Array[String]) = {
+  def run(args: Array[String]) = {
     // rows and cols arguments
     try {
       if (args.length > 0) rows = java.lang.Integer.parseInt(args(0))
@@ -53,6 +54,8 @@ object GraphLBP {
     catch {
       case _: Exception => print_usage
     }
+
+    Delite.init = true
 
     // Generate image
     val img = new LBPImage(rows, cols)
@@ -66,6 +69,8 @@ object GraphLBP {
 
     // Make sure we read in the raw file correctly
     // img.save("check_img.pgm")
+
+    Delite.init = false
 
     val num = 2
     for (i <- 0 until num) {
@@ -99,7 +104,7 @@ object GraphLBP {
     }
 
     println(edgePotential)
-
+    var count = 0
     implicit val pFact = new MessageGraph.ProxyFactory[VertexData, EdgeData]
 
     g.untilConverged(Consistency.Edge) {
@@ -140,11 +145,16 @@ object GraphLBP {
           // Compute message residual
           val residual = outMsg.residual(outEdge.old_message)
 
+          if (count % 1000 == 0) {
+            println(count + " " + residual)
+          }
+
           // Enqueue update function on target vertex if residual is greater than bound
           if (residual > bound) {
             v.addTask(e.target(v))
           }
         }
+        count += 1
     }
 
     // Predict the image! Well as of now we don't even get to this point, so fuck
