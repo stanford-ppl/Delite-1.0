@@ -1,7 +1,7 @@
 package ppl.apps.ml.lbp
 
-import ppl.apps.ml.lbp.Graph.{Consistency}
-import ppl.apps.ml.baseline.lbp.LBPImage
+import ppl.delite.dsl.optiml.MessageGraph
+import ppl.delite.dsl.optiml.Graph.{Consistency}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -17,29 +17,6 @@ class EdgeData(var message: UnaryFactor, var old_message: UnaryFactor) {
   }
 }
 class VertexData(var potential: UnaryFactor, var belief: UnaryFactor)
-
-// Edge that can pass message back and forth between two vertices
-class MessageEdge(val v1: VertexData, val inEdgeV1: EdgeData, val v2: VertexData, val inEdgeV2: EdgeData) {
-  // In edge
-  def in(v: VertexData): EdgeData = {
-    assert(v == v1 || v == v2)
-
-    if (v == v1) inEdgeV1 else inEdgeV2
-  }
-
-  // Out edge
-  def out(v: VertexData): EdgeData = {
-    assert(v == v1 || v == v2)
-
-    if (v == v1) inEdgeV2 else inEdgeV1
-  }
-
-  def notMe(v: VertexData): VertexData = {
-    assert(v == v1 || v == v2)
-
-    if (v == v1) v2 else v1
-  }
-}
 
 object GraphLBP {
   var colors = 5
@@ -123,18 +100,20 @@ object GraphLBP {
 
     println(edgePotential)
 
+    implicit val pFact = new MessageGraph.ProxyFactory[VertexData, EdgeData]
+
     g.untilConverged(Consistency.Edge) {
-      (v: g.Vertex) =>
+      v =>
       // Flip messages on in edges
         for (e <- v.edges) {
-          e.in(v.data).old_message = e.in(v.data).message
+          e.in(v).old_message = e.in(v).message
         }
 
         v.data.belief = v.data.potential.copy()
 
         // Multiply belief by messages
         for (e <- v.edges) {
-          v.data.belief.times(e.in(v.data).old_message)
+          v.data.belief.times(e.in(v).old_message)
         }
 
         // Normalize the belief
@@ -144,11 +123,11 @@ object GraphLBP {
         for (e <- v.edges) {
           // Compute the cavity
           val cavity = v.data.belief.copy()
-          cavity.divide(e.in(v.data).old_message)
+          cavity.divide(e.in(v).old_message)
           cavity.normalize()
 
           // Convolve the cavity with the edge factor
-          val outEdge = e.out(v.data)
+          val outEdge = e.out(v)
           val outMsg = new UnaryFactor(outEdge.message.v, outEdge.message.arity)
           outMsg.convolve(edgePotential, cavity)
           outMsg.normalize()
@@ -163,7 +142,7 @@ object GraphLBP {
 
           // Enqueue update function on target vertex if residual is greater than bound
           if (residual > bound) {
-            v.addTask(e.notMe(v.data))
+            v.addTask(e.target(v))
           }
         }
     }
@@ -183,8 +162,8 @@ object GraphLBP {
     img
   }
 
-  def constructGraph(img: LBPImage, numRings: Int, sigma: Double): UndirectedGraph[VertexData, MessageEdge] = {
-    val g = new UndirectedGraphImpl[VertexData, MessageEdge]
+  def constructGraph(img: LBPImage, numRings: Int, sigma: Double): MessageGraph[VertexData, EdgeData] = {
+    val g = new MessageGraph[VertexData, EdgeData]
 
     // Same belief for everyone
     val belief = new UnaryFactor(0, numRings)
@@ -239,14 +218,14 @@ object GraphLBP {
 
         val edgeRight = templateEdge.copy()
 
-        g.addEdge(new MessageEdge(vertices(i)(j), edgeRight, vertices(i)(j + 1), baseEdge.copy()), vertices(i)(j), vertices(i)(j + 1))
+        g.addEdge(edgeRight, baseEdge.copy(), vertices(i)(j), vertices(i)(j + 1))
 
         message.v = img.vertid(i + 1, j)
         oldMessage.v = img.vertid(i + 1, j)
 
         val edgeDown = templateEdge.copy()
 
-        g.addEdge(new MessageEdge(vertices(i)(j), edgeDown, vertices(i + 1)(j), baseEdge.copy()), vertices(i)(j), vertices(i + 1)(j))
+        g.addEdge(edgeDown, baseEdge.copy(), vertices(i)(j), vertices(i + 1)(j))
       }
     }
 

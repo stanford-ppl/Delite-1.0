@@ -42,7 +42,7 @@ trait Graph[V, E] {
 
   def containsVertex(v: V): Boolean
 
-  class Scope(v: V, g: Graph[V, E], f : (V, Scope) => Unit, s: Scheduler[V]) {
+  class Vertex(v: V, g: Graph[V, E], f : (Vertex) => Unit, s: Scheduler[V]) {
     val data = v
     var edgeAccess = false
     var neighborAccess = false
@@ -65,15 +65,15 @@ trait Graph[V, E] {
     }
   }
 
-  def updateAll(c: Graph.Consistency.Consistency)(f: (V, Scope) => Unit) {
+  def untilConverged(c: Graph.Consistency.Consistency)(f: (Vertex) => Unit) {
     val sched = new FifoScheduler[V]
     sched.addTasks(vertexList)
 
     while (sched.hasTask) {
       val v = sched.getTask()
 
-      val scope = new Scope(v, this, f, sched)
-      f(v, scope)
+      val scope = new Vertex(v, this, f, sched)
+      f(scope)
     }
   }
 }
@@ -208,5 +208,48 @@ class DirectedGraphImpl[V, E] extends DirectedGraph[V, E] {
       in_edge_list(b) -= ((e, a))
       edge_map.remove(e)
     }
+  }
+}
+
+
+// Edge that can pass message back and forth between two vertices
+class MessageEdge[V, E](val v1: V, val message1: E, val v2: V, val message2: E) {
+  // In edge
+  def in(v: V): E = {
+    assert(v == v1 || v == v2)
+
+    if (v == v1) message1 else message2
+  }
+
+  def in(v: Graph[V, MessageEdge[V, E]]#Vertex): E = {
+    in(v.data)
+  }
+
+  // Out edge
+  def out(v: V): E = {
+    assert(v == v1 || v == v2)
+
+    if (v == v1) message2 else message1
+  }
+
+  def out(v: Graph[V, MessageEdge[V, E]]#Vertex): E = {
+    out(v.data)
+  }
+
+  def target(v: V): V = {
+    assert(v == v1 || v == v2)
+
+    if (v == v1) v2 else v1
+  }
+
+  def target(v: Graph[V, MessageEdge[V, E]]#Vertex): V = {
+    target(v.data)
+  }
+}
+
+
+class MessageGraph[V, E] extends UndirectedGraphImpl[V, MessageEdge[V, E]] {
+  def addEdge(e1: E, e2: E, a: V, b: V): Unit = {
+    addEdge(new MessageEdge(a, e1, b, e2), a, b)
   }
 }

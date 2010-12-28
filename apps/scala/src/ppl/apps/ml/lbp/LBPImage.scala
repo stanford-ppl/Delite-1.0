@@ -1,4 +1,4 @@
-package ppl.apps.ml.baseline.lbp
+package ppl.apps.ml.lbp
 
 import util.Random
 import java.io.{BufferedReader, FileReader}

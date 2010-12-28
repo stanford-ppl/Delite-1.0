@@ -25,15 +25,15 @@ object GraphTest {
     g.addEdge(es(0), vs(0), vs(1))
     g.addEdge(es(1), vs(1), vs(2))
 
-    def updateFunction(v: TestVertex, scope: Graph[TestVertex, TestEdge]#Scope) : Unit = {
-       v.value += 1;
+    def updateFunction(v: Graph[TestVertex, TestEdge]#Vertex) : Unit = {
+       v.data.value += 1;
 
-      if(v.value < 3) {
-        scope.addTask(Graph.Consistency.Auto, v)
+      if(v.data.value < 3) {
+        v.addTask(Graph.Consistency.Auto, v.data)
       }
     }
 
-    g.updateAll(Graph.Consistency.Auto) (updateFunction)
+    g.untilConverged(Graph.Consistency.Auto) (updateFunction)
 
     val values = g.vertexSet.toList map {_.value}
     println(values)
