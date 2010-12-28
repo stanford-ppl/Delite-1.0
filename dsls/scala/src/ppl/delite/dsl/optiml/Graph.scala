@@ -23,7 +23,7 @@ object Graph {
     val Auto, Vertex, Edge, Full = Value
   }
 
-  case class OP_untilConverged[V, E](g: Graph[V, E], f: (Graph[V, E]#Vertex) => Unit, c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V]) extends DeliteOP_MutableSingleTask[Graph[V, E]]()(g) {
+  case class OP_untilConverged[V, E](g: Graph[V, E], f: (Graph[V, E]#Vertex) => Unit, c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V]) extends DeliteOP_SingleTask[Graph[V, E]]() {
     def task = {
       sched.addTasks(g.vertexList)
 
@@ -96,7 +96,7 @@ trait Graph[V, E] extends DeliteDSLType {
 
   def generateVertex(v: V): Vertex
 
-  def untilConverged(c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V])(f: (Graph[V, E]#Vertex) => Unit)(implicit pFact: Graph.ProxyFactory[V,E]) {
+  def untilConverged(c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V])(f: (Graph[V, E]#Vertex) => Unit)(implicit pFact: Graph.ProxyFactory[V,E]) : Graph[V, E] = {
     Delite.run(OP_untilConverged[V,E](this, f, c, sched))
   }
 }

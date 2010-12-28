@@ -3,6 +3,7 @@ package ppl.apps.ml.lbp
 import ppl.delite.dsl.optiml.MessageGraph
 import ppl.delite.dsl.optiml.Graph.{Consistency}
 import ppl.delite.core.{Delite, DeliteApplication}
+import ppl.delite.metrics.PerformanceTimer
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -75,7 +76,10 @@ object GraphLBP extends DeliteApplication {
     val num = 2
     for (i <- 0 until num) {
       // Clean up the image and save it
+      PerformanceTimer.start("LBP")
       val cleanImg = denoise(img)
+      PerformanceTimer.stop("LBP")
+      PerformanceTimer.print("LBP")
       cleanImg.save("pred.pgm")
     }
 
@@ -104,10 +108,11 @@ object GraphLBP extends DeliteApplication {
     }
 
     println(edgePotential)
-    var count = 0
     implicit val pFact = new MessageGraph.ProxyFactory[VertexData, EdgeData]
 
-    g.untilConverged(Consistency.Edge) {
+    //var count = 1
+
+    val g2 = g.untilConverged(Consistency.Edge) {
       v =>
       // Flip messages on in edges
         for (e <- v.edges) {
@@ -145,26 +150,27 @@ object GraphLBP extends DeliteApplication {
           // Compute message residual
           val residual = outMsg.residual(outEdge.old_message)
 
-          if (count % 1000 == 0) {
+          /*if(count % 100000 == 0) {
             println(count + " " + residual)
-          }
+          }*/
 
           // Enqueue update function on target vertex if residual is greater than bound
           if (residual > bound) {
             v.addTask(e.target(v))
           }
         }
-        count += 1
+
+      //count += 1
     }
 
     // Predict the image! Well as of now we don't even get to this point, so fuck
     if (pred_type == "map") {
-      for (v <- g.vertexSet) {
+      for (v <- g2.vertexSet) {
         img.data(v.belief.v) = v.belief.max_asg();
       }
     }
     else if (pred_type == "exp") {
-      for (v <- g.vertexSet) {
+      for (v <- g2.vertexSet) {
         img.data(v.belief.v) = v.belief.max_asg();
       }
     }
