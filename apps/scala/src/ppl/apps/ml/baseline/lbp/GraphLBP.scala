@@ -1,6 +1,7 @@
 package ppl.apps.ml.baseline.lbp
 
 import ppl.apps.ml.lbp.{UnaryFactor, BinaryFactor, LBPImage}
+import ppl.delite.metrics.PerformanceTimer
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -69,7 +70,10 @@ object GraphLBP {
     val num = 2
     for (i <- 0 until num) {
       // Clean up the image and save it
+      PerformanceTimer.start("LBP")
       val cleanImg = denoise(img)
+      PerformanceTimer.stop("LBP")
+      PerformanceTimer.print("LBP")
       cleanImg.save("pred.pgm")
     }
 

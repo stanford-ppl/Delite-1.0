@@ -110,9 +110,9 @@ object GraphLBP extends DeliteApplication {
     println(edgePotential)
     implicit val pFact = new MessageGraph.ProxyFactory[VertexData, EdgeData]
 
-    //var count = 1
+   // var count = 1
 
-    val g2 = g.untilConverged(Consistency.Edge) {
+    g.untilConvergedData(Consistency.Edge) {
       v =>
       // Flip messages on in edges
         for (e <- v.edges) {
@@ -150,9 +150,9 @@ object GraphLBP extends DeliteApplication {
           // Compute message residual
           val residual = outMsg.residual(outEdge.old_message)
 
-          /*if(count % 100000 == 0) {
+          /*if(count % 10000 == 0) {
             println(count + " " + residual)
-          }*/
+          } */
 
           // Enqueue update function on target vertex if residual is greater than bound
           if (residual > bound) {
@@ -160,17 +160,17 @@ object GraphLBP extends DeliteApplication {
           }
         }
 
-      //count += 1
+     // count += 1
     }
 
     // Predict the image! Well as of now we don't even get to this point, so fuck
     if (pred_type == "map") {
-      for (v <- g2.vertexSet) {
+      for (v <- g.vertexSet) {
         img.data(v.belief.v) = v.belief.max_asg();
       }
     }
     else if (pred_type == "exp") {
-      for (v <- g2.vertexSet) {
+      for (v <- g.vertexSet) {
         img.data(v.belief.v) = v.belief.max_asg();
       }
     }

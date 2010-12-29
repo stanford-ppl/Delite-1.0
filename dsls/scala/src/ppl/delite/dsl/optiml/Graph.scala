@@ -1,9 +1,11 @@
 package ppl.delite.dsl.optiml
 
 import collection.Set
-import collection.mutable.{ArrayBuffer, Map}
 import ppl.delite.core.ops._
-import ppl.delite.core.{DeliteProxyFactory, DeliteDSLType, Delite}
+import ppl.delite.core.{DeliteProxyFactory, DeliteDSLType, Delite, DeliteUnit, DeliteFunc, DeliteCollection}
+import collection.mutable.{Queue, ArrayBuffer, Map, HashSet}
+import java.util.concurrent.locks.ReentrantLock
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -14,8 +16,8 @@ import ppl.delite.core.{DeliteProxyFactory, DeliteDSLType, Delite}
  */
 
 object Graph {
-  abstract class ProxyFactory[V, E] extends DeliteProxyFactory[Graph[V,E]] {
-    def newProxy() : Graph[V,E]
+  abstract class ProxyFactory[V, E] extends DeliteProxyFactory[Graph[V, E]] {
+    def newProxy(): Graph[V, E]
   }
 
   object Consistency extends Enumeration {
@@ -23,7 +25,9 @@ object Graph {
     val Auto, Vertex, Edge, Full = Value
   }
 
-  case class OP_untilConverged[V, E](g: Graph[V, E], f: (Graph[V, E]#Vertex) => Unit, c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V]) extends DeliteOP_SingleTask[Graph[V, E]]() {
+  case class OP_untilConvergedSingle[V, E](g: Graph[V, E], f: (Graph[V, E]#Vertex) => Unit, c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V]) extends DeliteOP_SingleTask[Graph[V, E]]() {
+    val locks = new ConcurrentHashMap[V, ReentrantLock]
+
     def task = {
       sched.addTasks(g.vertexList)
 
@@ -31,6 +35,7 @@ object Graph {
         val vertexData = sched.getTask()
 
         val vertex = g.generateVertex(vertexData)
+        val sortedVertices = g.fullVertices(vertex)
         f(vertex)
 
         if (vertex.tasks.size > 0) {
@@ -41,6 +46,8 @@ object Graph {
       g
     }
   }
+
+
 }
 
 trait Graph[V, E] extends DeliteDSLType {
@@ -62,13 +69,17 @@ trait Graph[V, E] extends DeliteDSLType {
 
   def adjacent(a: V, b: V): Boolean
 
-  def neighborsOf(a: V): Set[V]
+  def neighborsOf(a: V): Seq[V]
 
-  def edgesOf(a: V): Set[E]
+  def edgesOf(a: V): Seq[E]
 
   def containsEdge(e: E): Boolean
 
   def containsVertex(v: V): Boolean
+
+  protected var _sorted = false
+  def sorted: Boolean = _sorted
+  def sort(): Unit
 
   class Vertex(v: V) {
     val data = v
@@ -96,7 +107,132 @@ trait Graph[V, E] extends DeliteDSLType {
 
   def generateVertex(v: V): Vertex
 
-  def untilConverged(c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V])(f: (Graph[V, E]#Vertex) => Unit)(implicit pFact: Graph.ProxyFactory[V,E]) : Graph[V, E] = {
-    Delite.run(OP_untilConverged[V,E](this, f, c, sched))
+  def untilConvergedSingle(c: Consistency.Consistency, sched: Scheduler[V] = new FifoScheduler[V])(f: (Graph[V, E]#Vertex) => Unit)(implicit pFact: Graph.ProxyFactory[V, E]): Unit = {
+    if(!sorted) {
+      sort()
+    }
+
+    Delite.run(OP_untilConvergedSingle[V, E](this, f, c, sched)).force
+  }
+
+  def untilConvergedTask(c: Consistency.Consistency)(f: (Vertex) => Unit)(implicit mV: ClassManifest[V]): Unit = {
+    if(!sorted) {
+      sort()
+    }
+
+    implicit val proxyFactory = new Vector.ProxyFactory[V]
+    val locks = new ConcurrentHashMap[V, ReentrantLock]
+    val queue = new Queue[V]
+    queue ++= vertexList
+
+    case class OP_untilConvergedTask(v: Vertex) extends DeliteOP_SingleTask[Vector[V]]() {
+      def task = {
+        val vertices = fullVertices(v)
+        lockVerticesFull(vertices, locks)
+        f(v)
+        unlockVerticesFull(vertices, locks)
+
+        val tasks = Vector[V](v.tasks.length)
+
+        var i = 0
+        while (i < v.tasks.length) {
+          tasks(i) = v.tasks(i)
+          i += 1
+        }
+
+        tasks
+      }
+    }
+
+    while (!queue.isEmpty) {
+      val queue2 = new Queue[Vector[V]]
+
+      do {
+        val vertexData = queue.dequeue()
+
+        val vertex = generateVertex(vertexData)
+        queue2 += Delite.run(OP_untilConvergedTask(vertex))
+      } while (!queue.isEmpty)
+
+      val taskSet = new HashSet[V]
+
+      for (local <- queue2) {
+        val len = local.length
+        var i = 0
+        while (i < len) {
+          val v = local.dc_apply(i)
+          if (!taskSet.contains(v)) {
+            taskSet += v
+            queue += v
+          }
+          i += 1
+        }
+      }
+    }
+  }
+
+  def untilConvergedData(c: Consistency.Consistency)(f: (Graph[V, E]#Vertex) => Unit)(implicit mV: ClassManifest[V]): Unit = {
+    if(!sorted) {
+      sort()
+    }
+        
+    // Ugh
+    implicit val proxyFactory = new Vector.ProxyFactory[V]
+
+    // List of locks
+    val locks = new ConcurrentHashMap[V, ReentrantLock]
+
+    // Copy all vertices over into starting list
+    var vertices = Vector[V](vertexList.length)
+
+    var i = 0
+    for(v <- vertexList) {
+      vertices(i) = v
+      i += 1
+    }
+
+    while (!vertices.isEmpty) {
+      vertices = Delite.run(new GraphOP_untilConvergedData[V,E](this, vertices, f, locks))
+    }
+  }
+
+  def fullVertices(v: Vertex): Seq[V] = {
+    val sorted = new ArrayBuffer[V](v.neighbors.size + 1)
+
+    var i = 0
+    var j = 0
+    while(i + j < sorted.length) {
+      if(j < 1 && System.identityHashCode(v.data) < System.identityHashCode(v.neighbors(i))) {
+        sorted(i) = v.data
+        j += 1
+      }
+      else {
+        sorted(i + j) = v.neighbors(i)
+        i += 1
+      }
+    }
+    sorted
+  }
+
+  def lockVerticesFull(vertices: Seq[V], locks: ConcurrentHashMap[V, ReentrantLock]) = {
+    var i = 0
+
+    while (i < vertices.length) {
+      locks.get(vertices(i)).lock()
+      i += 1
+    }
+  }
+
+  def unlockVerticesFull(vertices: Seq[V], locks: ConcurrentHashMap[V, ReentrantLock]) = {
+    var i = vertices.length - 1
+
+    while (i >= 0) {
+      locks.get(vertices(i)).unlock()
+      i -= 1
+    }
   }
 }
+
+abstract class LockType
+case class ReadLock extends LockType
+case class WriteLock extends LockType

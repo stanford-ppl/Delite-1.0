@@ -26,7 +26,7 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V, E] {
 
   protected var edge_map = Map[E, (V, V)]()
   protected var vertices_edge_map = Map[(V, V), E]()
-  protected var vertex_edge_list = Map[V, Set[(E, V)]]()
+  protected var vertex_edge_list = Map[V, List[(E, V)]]()
   protected var vertex_list = ArrayBuffer[V]()
 
   override def concretize = {
@@ -39,16 +39,13 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V, E] {
 
   def vertexList() = vertex_list.toList
 
-  def vertexSet() = {
-    force
-    vertex_edge_list.keySet
-  }
+  def vertexSet() = vertex_edge_list.keySet
 
   def edgeSet() = edge_map.keySet
 
   def neighborsOf(v: V) = {
     if (!vertex_edge_list.contains(v)) {
-      Set()
+      Seq()
     }
     else {
       vertex_edge_list(v) map (_._2)
@@ -57,7 +54,7 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V, E] {
 
   def edgesOf(v: V) = {
     if (!vertex_edge_list.contains(v)) {
-      Set()
+      Seq()
     }
     else {
       vertex_edge_list(v) map (_._1)
@@ -69,15 +66,15 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V, E] {
   def addVertex(v: V) = {
     if (!vertex_edge_list.contains(v)) {
       vertex_list += v
-      vertex_edge_list(v) = Set()
+      vertex_edge_list(v) = List()
     }
   }
 
   def addEdge(e: E, a: V, b: V) = {
     if (!edge_map.contains(e)) {
       vertices_edge_map((a, b)) = e
-      vertex_edge_list(a) += ((e, b))
-      vertex_edge_list(b) += ((e, a))
+      vertex_edge_list(a) ::= ((e, b))
+      vertex_edge_list(b) ::= ((e, a))
     }
   }
 
@@ -94,6 +91,13 @@ class UndirectedGraphImpl[V, E] extends UndirectedGraph[V, E] {
       vertex_edge_list(b) -= ((e, a))
       edge_map.remove(e)
     }
+  }
+
+  def sort() : Unit = {
+    for((vertex, edgeList) <- vertex_edge_list) {
+      vertex_edge_list(vertex) = edgeList.sortBy{case(e, v) => System.identityHashCode(v)}
+    }
+    _sorted = true
   }
 
   def generateVertex(v: V): Vertex = {
