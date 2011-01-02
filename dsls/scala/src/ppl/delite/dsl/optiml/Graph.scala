@@ -4,8 +4,8 @@ import collection.Set
 import ppl.delite.core.ops._
 import ppl.delite.core.{DeliteProxyFactory, DeliteDSLType, Delite, DeliteUnit, DeliteFunc, DeliteCollection}
 import collection.mutable.{Queue, ArrayBuffer, Map, HashSet}
-import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock, ReentrantLock}
 
 /**
  * author: Michael Wu (mikemwu@stanford.edu)
@@ -214,6 +214,24 @@ trait Graph[V, E] extends DeliteDSLType {
     sorted
   }
 
+  def edgeVertices(v: Vertex): Seq[(V, LockType)] = {
+    val sorted = new ArrayBuffer[(V, LockType)](v.neighbors.size + 1)
+
+    var i = 0
+    var j = 0
+    while(i + j < sorted.length) {
+      if(j < 1 && System.identityHashCode(v.data) < System.identityHashCode(v.neighbors(i))) {
+        sorted(i) = (v.data, WriteLock())
+        j += 1
+      }
+      else {
+        sorted(i + j) = (v.neighbors(i), ReadLock())
+        i += 1
+      }
+    }
+    sorted
+  }
+
   def lockVerticesFull(vertices: Seq[V], locks: ConcurrentHashMap[V, ReentrantLock]) = {
     var i = 0
 
@@ -229,6 +247,101 @@ trait Graph[V, E] extends DeliteDSLType {
     while (i >= 0) {
       locks.get(vertices(i)).unlock()
       i -= 1
+    }
+  }
+
+  def lockVerticesEdge(v: V, vertices: Seq[V], locks: ConcurrentHashMap[V, ReentrantReadWriteLock]) = {
+    var i = 0
+
+    while (i < vertices.length) {
+      if(vertices(i) == v) {
+        locks.get(vertices(i)).writeLock().lock()
+      }
+      else {
+        locks.get(vertices(i)).readLock.lock()
+      }
+      i += 1
+    }
+  }
+
+  def unlockVerticesEdge(v: V, vertices: Seq[V], locks: ConcurrentHashMap[V, ReentrantReadWriteLock]) = {
+    var i = vertices.length - 1
+
+    while (i >= 0) {
+      if(vertices(i) == v) {
+        locks.get(vertices(i)).writeLock().unlock()
+      }
+      else {
+        locks.get(vertices(i)).readLock.unlock()
+      }
+      i -= 1
+    }
+  }
+
+  def vertexVertices(v: Vertex, locks: ConcurrentHashMap[V, ReentrantReadWriteLock]):Seq[(V, Lock)] = {
+    Seq((v.data, locks.get(v.data).writeLock)) 
+  }
+
+  def fullVertices2(v: Vertex, locks: ConcurrentHashMap[V, ReentrantReadWriteLock]): Seq[(V, Lock)] = {
+    val sorted = new ArrayBuffer[(V, Lock)](v.neighbors.size + 1)
+
+    var i = 0
+    var j = 0
+    while(i + j < sorted.length) {
+      if(j < 1 && System.identityHashCode(v.data) < System.identityHashCode(v.neighbors(i))) {
+        sorted(i) = (v.data, locks.get(v.data).writeLock())
+        j += 1
+      }
+      else {
+        sorted(i + j) = (v.neighbors(i), locks.get(v.neighbors(i)).writeLock())
+        i += 1
+      }
+    }
+    sorted
+  }
+
+  def edgeVertices2(v: Vertex, locks: ConcurrentHashMap[V, ReentrantReadWriteLock]): Seq[(V, Lock)] = {
+    val sorted = new ArrayBuffer[(V, Lock)](v.neighbors.size + 1)
+
+    var i = 0
+    var j = 0
+    while(i + j < sorted.length) {
+      if(j < 1 && System.identityHashCode(v.data) < System.identityHashCode(v.neighbors(i))) {
+        sorted(i) = (v.data, locks.get(v.data).writeLock())
+        j += 1
+      }
+      else {
+        sorted(i + j) = (v.neighbors(i), locks.get(v.neighbors(i)).readLock())
+        i += 1
+      }
+    }
+    sorted
+  }
+
+ def lockVertices(vertices: Seq[(V, Lock)]) = {
+    var i = 0
+
+    while (i < vertices.length) {
+      vertices(i)._2.lock()
+      i += 1
+    }
+  }
+
+  def unlockVertices(vertices: Seq[(V, Lock)]) = {
+    var i = vertices.length - 1
+
+    while (i >= 0) {
+      vertices(i)._2.unlock()
+      i -= 1
+    }
+  }
+
+  def consistencyVertices(v: Vertex, c: Consistency.Consistency, locks: ConcurrentHashMap[V, ReentrantReadWriteLock]) : Seq[(V, Lock)] = {
+    c match {
+      case Consistency.Vertex => vertexVertices(v, locks)
+      case Consistency.Edge => edgeVertices2(v, locks)
+      case Consistency.Full => fullVertices2(v, locks)
+      case _ => Seq()
     }
   }
 }
