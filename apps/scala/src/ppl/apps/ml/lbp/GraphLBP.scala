@@ -73,7 +73,7 @@ object GraphLBP extends DeliteApplication {
 
     Delite.init = false
 
-    val num = 2
+    val num = 5
     for (i <- 0 until num) {
       // Clean up the image and save it
       PerformanceTimer.start("LBP")
@@ -110,9 +110,9 @@ object GraphLBP extends DeliteApplication {
     println(edgePotential)
     implicit val pFact = new MessageGraph.ProxyFactory[VertexData, EdgeData]
 
-   // var count = 1
+   //var count = 1
 
-    g.untilConvergedData(Consistency.Edge) {
+    g.untilConvergedTask(Consistency.Edge) {
       v =>
       // Flip messages on in edges
         for (e <- v.edges) {
@@ -150,7 +150,7 @@ object GraphLBP extends DeliteApplication {
           // Compute message residual
           val residual = outMsg.residual(outEdge.old_message)
 
-          /*if(count % 10000 == 0) {
+        /*  if(count % 10000 == 0) {
             println(count + " " + residual)
           } */
 
@@ -160,7 +160,7 @@ object GraphLBP extends DeliteApplication {
           }
         }
 
-     // count += 1
+      //count += 1
     }
 
     // Predict the image! Well as of now we don't even get to this point, so fuck
