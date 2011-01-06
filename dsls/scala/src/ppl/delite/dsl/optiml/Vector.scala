@@ -60,6 +60,10 @@ object Vector {
     Delite.run(OP_rand(length))
   }
 
+  def randn(length: Int) : Vector[Double] = {
+    Delite.run(OP_randn(length))
+  }
+
   // TODO: right now there are only 2 distinctions between uniform and range:
   //       1) uniform defers, and range doesn't (why?)
   //       2) uniform returns doubles and range returns ints (need to check if this makes a substantial difference in terms of efficiency)
@@ -253,6 +257,14 @@ object Vector {
     val coll = Vector[Int](length)
     val out = Vector[Double](length)
     def func = e => random[Double]
+  }
+
+  protected[optiml] case class OP_randn(length: Int)
+    extends DeliteOP_Map[Int,Double,Vector]{
+
+    val coll = Vector[Int](length)
+    val out = Vector[Double](length)
+    def func = e => randomGaussian
   }
 
   /* Generate a vector with values from start to end at step_size intervals */

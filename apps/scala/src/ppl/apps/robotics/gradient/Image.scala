@@ -27,7 +27,7 @@ class Image(val rows: Int, val cols: Int, val data: Matrix[Int]) {
   }
 
   def downsample(): Image = {
-    val downsampled = new Image(rows / 2 - 1, cols / 2 - 1)
+    val downsampled = new Image(rows / 2, cols / 2)
 
     for (i <- 0 until downsampled.rows) {
       for (j <- 0 until downsampled.cols) {

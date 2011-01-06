@@ -18,7 +18,9 @@ object runTest extends DeliteApplication {
     Delite.init = true
     val image = Image.load(args(0))
     val templateFiles = Vector[String]()
-    new java.io.File(args(1)).listFiles.map { file => templateFiles += file.getPath()}
+    new java.io.File(args(1)).getCanonicalFile.listFiles.map{
+      file => templateFiles += file.getPath()
+    }
 
     val bigg = new BinarizedGradientGrid(templateFiles)
     Delite.init = false
@@ -28,8 +30,22 @@ object runTest extends DeliteApplication {
       PerformanceTimer.start("Gradient")
       bigg.detectMain(image)
       PerformanceTimer.stop("Gradient")
+
+      PerformanceTimerAggregate.print("computeGradients")
+      PerformanceTimerAggregate.print("pyramid")
+      PerformanceTimerAggregate.print("detectLoop")
+      PerformanceTimerAggregate.print("detect2")
+      PerformanceTimerAggregate.print("detect3")
+      PerformanceTimerAggregate.print("nonMaxSuppress")
       PerformanceTimer.print("Gradient")
+      if (i != numTimes) PerformanceTimerAggregate.incrementEpoch
     }
+    PerformanceTimerAggregate.save("computeGradients")
+    PerformanceTimerAggregate.save("pyramid")
+    PerformanceTimerAggregate.save("detectLoop")
+    PerformanceTimerAggregate.save("detect2")
+    PerformanceTimerAggregate.save("detect3")
+    PerformanceTimerAggregate.save("nonMaxSuppress")
     PerformanceTimer.save("Gradient")
   }
 }
