@@ -138,7 +138,7 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
     for (y <- ystart until yend) {
       val imageRow = gradSummary.data(y)
       for (x <- xstart until xend) {
-        var index = (yoffset + y - ystart) * span + (xoffset + x - xstart); //If this were an image patch, this is the offset to it
+        var index = (yoffset + y - ystart) * span + (xoffset + x - xstart) //If this were an image patch, this is the offset to it
         tpl.binary_gradients(index) = imageRow(x)
         if (imageRow(x) > 0) {
           //Record where gradients are
@@ -249,15 +249,14 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
 
     PerformanceTimerAggregate.start("detect3")
     val crt_detections = detect3(pyr.getIndex(level), locations, templates, newRadius, level, accept_threshold)
+    crt_detections.force  // Force the result for timing purposes
     PerformanceTimerAggregate.stop("detect3")
-    PerformanceTimerAggregate.start("detect3p")
-    crt_detections.force
-    PerformanceTimerAggregate.stop("detect3p")
 
     //	printf("Before nms, detections: %d\n", crt_detections.size());
     println("Detections: " + crt_detections.length)
 
     if (level > pyr.start_level) {
+      println("Transitioning to next level of pyramid")
       for (i <- 0 until crt_detections.length) {
         val crt_locations = Vector[Point2i]()
 
@@ -314,13 +313,19 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
 //    detections
   }
 
+//  var printcount = 0
+
   def searchTemplates(gradSummary: Image, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
     val reduction_factor = (1 << level)
+//    PerformanceTimerAggregate.start("fill")
     val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
+//    PerformanceTimerAggregate.stop("fill")
     templates.indices.flatMap{
       j =>
         val res = templates(j).score(crt_template, accept_threshold, match_table, match_method_)
         if (res > accept_threshold) {
+//          if (printcount < 10) { println(res); printcount += 1}
+
 //          println("Level: " + level + ", score: " + res)
           val detection = new BiGGDetection()
           val bbox = templates(j).rect
@@ -352,44 +357,46 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
 
     val img_gray = image // assuming image is single-channel. Needs to be made such if not.
 
-    PerformanceTimer.start("computeGradients")
+    PerformanceTimerAggregate.start("computeGradients")
     val (mag, phase) = computeGradients(img_gray)
-    PerformanceTimer.stop("computeGradients")
-    PerformanceTimer.print("computeGradients")
+    PerformanceTimerAggregate.stop("computeGradients")
     val binGrad = binarizeGradients(mag, phase)
     val cleanGrad = gradMorphology(binGrad)
 //    cleanGrad.data.pprint
 
-    PerformanceTimer.start("pyramid")
+    PerformanceTimerAggregate.start("pyramid")
     val pyr = new BinarizedGradientPyramid(cleanGrad, start_level_, levels_) // build two levels starting with level 2
-    PerformanceTimer.stop("pyramid")
-    PerformanceTimer.print("pyramid")
+    PerformanceTimerAggregate.stop("pyramid")
 
     println("Doing detection")
 
     val all_detections = Vector[BiGGDetection]()
     var index = 0
-    PerformanceTimer.start("detectLoop")
+    PerformanceTimerAggregate.start("detectLoop")
     all_templates.foreach {
       root_templates =>
         val detections = Vector[BiGGDetection]()
         val everywhere = Vector[Point2i]()
         println("Using " + root_templates.length + " templates")
+        PerformanceTimerAggregate.start("detect2")
         detect2(image, pyr.start_level + pyr.levels - 1, pyr, everywhere, root_templates, detections, template_radius_, accept_threshold_, accept_threshold_decay_)
+        detections.force // Force the result for timing purposes
+        PerformanceTimerAggregate.stop("detect2")
 
         detections.foreach {
           detection =>
             detection.name = names(index)
-            all_detections += detection
         }
-
-        all_detections ++= detections  // This is in the original code for some strange reason.  Remove?
+        all_detections ++= detections
         index += 1
     }
+    all_detections.force // Force the result for timing purposes
+    PerformanceTimerAggregate.stop("detectLoop")
+    PerformanceTimerAggregate.start("nonMaxSuppress")
     val filteredDetections = helper.nonMaxSuppress(all_detections, fraction_overlap_)
+    filteredDetections.force // Force the result for timing purposes
+    PerformanceTimerAggregate.stop("nonMaxSuppress")
     println("Total detections: " + filteredDetections.length)
-    PerformanceTimer.stop("detectLoop")
-    PerformanceTimer.print("detectLoop")
 
     // NEEDS TO BE RE-ADDED FOR FAIR C++ COMPARISON!
 //    detectionMsg.sizeHint(all_detections.length)

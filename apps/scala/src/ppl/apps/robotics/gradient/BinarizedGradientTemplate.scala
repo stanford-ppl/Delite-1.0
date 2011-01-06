@@ -74,6 +74,7 @@ class BinarizedGradientTemplate {
     var matches: Float = 0;
     if (match_method == 0) {
       var limit = (total * (1.0 - match_thresh) + 0.5).asInstanceOf[Int] //Miss more than this number and we can't be above match_thresh
+      println(limit)
       for (i <- 0 until match_list.length) {
         if (binary_gradients(i) == 0 && test.binary_gradients(i) == 0) {
           matches += 1
@@ -88,6 +89,7 @@ class BinarizedGradientTemplate {
           }
         }
       }
+      println(matches + "/" + total)
     } else { //match_method == 1, so we use the cosine matching table
       val limit = (match_thresh * 100.0).asInstanceOf[Int] //Since the matchtable are unsigned chars going from 0 to 100;
       var max_score = 100 * total
