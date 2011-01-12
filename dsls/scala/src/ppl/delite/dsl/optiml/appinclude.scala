@@ -420,6 +420,29 @@ object appinclude {
     next
   }
 
+  // 1D aggregate
+  def aggregate[T](start: Int, end: Int)(block: Int => Vector[T])(implicit c: ClassManifest[T]) : Vector[T] = {
+    (start :: end).flatMap { x =>
+      block(x)
+    }
+
+    // Other impl.: use a for loop to iterate over the data structure and use synchronization to aggregate values
+  }
+
+  // 2D aggregate
+  def aggregate[T](rowStart: Int, rowEnd: Int, colStart: Int, colEnd: Int)(block: (Int, Int) => Vector[T])(implicit c: ClassManifest[T]) : Vector[T] = {
+    (rowStart :: rowEnd).flatMap { y =>
+      (colStart :: colEnd).flatMap { x =>
+        block(x, y)
+      }
+    }
+
+    // Other impl.: use a for loop to iterate over the data structure and use synchronization to aggregate values
+  }
+
+  // OP_match? - iterate over a data structure and run some local op on the data to return a score
+  // OP_aggregate?
+
   private val MIN_BATCH_PROCS = 4
   def gradient(x: TrainingSet[Double], y: Labels[Double], alpha: Double = .001, thresh: Double = .0001,
                  max_iter: Int = 10000)(hyp: Vector[Double] => Double) : Vector[Double] = {
