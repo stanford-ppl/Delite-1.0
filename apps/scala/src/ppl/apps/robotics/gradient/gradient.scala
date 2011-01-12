@@ -12,7 +12,7 @@ import ppl.delite.dsl.primitive.{DeliteFloat, DeliteDouble}
 //
 //import ros.pkg.roscpp_tutorials.srv.TwoInts
 
-object runTest extends DeliteApplication {
+object gradient extends DeliteApplication {
   def run(args: Array[String]) = {
 
     Delite.init = true
@@ -28,7 +28,9 @@ object runTest extends DeliteApplication {
     var numTimes = 10
     for (i <- 0 until numTimes) {
       PerformanceTimer.start("Gradient")
-      bigg.detectMain(image)
+      for (imgs <- 0 until 3)
+        bigg.detectMain(image)
+
       PerformanceTimer.stop("Gradient")
 
       PerformanceTimerAggregate.print("computeGradients")

@@ -60,7 +60,6 @@ class BinarizedGradientTemplate {
    */
   def score(test: BinarizedGradientTemplate, match_thresh: Float, match_table: Matrix[Int], match_method: Int): Float = {
     if (radius != test.radius) {
-//      println(radius + " != " + test.radius)
       return -1.0f
     }
     var total: Float = match_list.length.asInstanceOf[Float]
@@ -74,12 +73,11 @@ class BinarizedGradientTemplate {
     var matches: Float = 0;
     if (match_method == 0) {
       var limit = (total * (1.0 - match_thresh) + 0.5).asInstanceOf[Int] //Miss more than this number and we can't be above match_thresh
-      println(limit)
       for (i <- 0 until match_list.length) {
-        if (binary_gradients(i) == 0 && test.binary_gradients(i) == 0) {
+        if (binary_gradients(match_list(i)) == 0 && test.binary_gradients(match_list(i)) == 0) {
           matches += 1
         }
-        else if (((binary_gradients(i)) & (test.binary_gradients(i))) > 0) {
+        else if (((binary_gradients(match_list(i))) & (test.binary_gradients(match_list(i)))) > 0) {
           matches += 1
         }
         else {
@@ -89,12 +87,11 @@ class BinarizedGradientTemplate {
           }
         }
       }
-      println(matches + "/" + total)
     } else { //match_method == 1, so we use the cosine matching table
       val limit = (match_thresh * 100.0).asInstanceOf[Int] //Since the matchtable are unsigned chars going from 0 to 100;
       var max_score = 100 * total
       for (i <- 0 until match_list.length) {
-        var res = match_table(binary_gradients(i), test.binary_gradients(i))
+        var res = match_table(binary_gradients(match_list(i)), test.binary_gradients(match_list(i)))
         matches += res
         max_score -= (100 - res) //Remember, we coded perfect match to be 100.
         if (max_score < limit)
