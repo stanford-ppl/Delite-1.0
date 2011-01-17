@@ -4,7 +4,7 @@ class BiGGDetection {
 	var name: String = null
   var score: Float = 0.0f
 	var roi: Rect = null
-	var mask: Image = null
+	var mask: GrayscaleImage = null
 	var index: Int = 0
 	var x: Int = 0
   var y: Int = 0

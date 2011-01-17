@@ -36,7 +36,7 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   }
 
   // Runs the object detection of the current image.
-  def detectAllObjects(image: Image) = {
+  def detectAllObjects(image: GrayscaleImage) = {
     val img_gray = image // assuming image is single-channel. Needs to be made such if not.
 
     val (mag, phase) = computeGradients(img_gray)
@@ -68,13 +68,13 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   }
 
   //Run detection for this object class.
-  def detectSingleObject(gradSummary: Image, templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
+  def detectSingleObject(gradSummary: GrayscaleImage, templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
     aggregate(5, gradSummary.rows - 5, 5, gradSummary.cols - 5) {
       (x, y) => searchTemplates(gradSummary, x, y, template_radius, level, accept_threshold, templates)
     }
   }
 
-  def searchTemplates(gradSummary: Image, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
+  def searchTemplates(gradSummary: GrayscaleImage, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
     val reduction_factor = (1 << level)
     val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
     aggregate(0, templates.length) { j =>
@@ -100,7 +100,7 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   }
 
   // Construct a template from a region of a gradient summary image.
-  def fillTemplateFromGradientImage(gradSummary: Image, xc: Int, yc: Int, r: Int, level: Int): BinarizedGradientTemplate = {
+  def fillTemplateFromGradientImage(gradSummary: GrayscaleImage, xc: Int, yc: Int, r: Int, level: Int): BinarizedGradientTemplate = {
     val span = 2 * r
     val tpl = new BinarizedGradientTemplate()
     tpl.radius = r
@@ -165,37 +165,34 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   }
 
   // Compute magnitude and phase in degrees from single channel image
-  def computeGradients(img: Image): (ImageF, ImageF) = {
+  def computeGradients(img: GrayscaleImage): (ImageF, ImageF) = {
     //Find X and Y gradients
     val (x, y) = img.scharr
     cartToPolar(x, y)
   }
 
-  def cartToPolar(x: Image, y: Image): (ImageF, ImageF) = {
+  def cartToPolar(x: GrayscaleImage, y: GrayscaleImage): (ImageF, ImageF) = {
     val mag = new ImageF(x.data.zipWith(y.data, (a, b) => math.sqrt(a*a + b*b).asInstanceOf[Float]))
     val phase = new ImageF(x.data.zipWith(y.data, (a, b) => (math.atan2(b, a)*180/math.Pi).asInstanceOf[Float]).mmap(a => if (a < 0) a + 360 else a))
     (mag, phase)
   }
 
   //Turn mag and phase into a binary representation of 8 gradient directions.
-  def binarizeGradients(mag: ImageF, phase: ImageF): Image = {
-    val binaryGradient = new Image(mag.rows, mag.cols)
-    for (i <- 0 until mag.rows) {
-      for (j <- 0 until mag.cols) {
-        if (mag.data(i, j) >= magnitude_threshold_) {
-          var angle = phase.data(i, j)
+  def binarizeGradients(mag: ImageF, phase: ImageF): GrayscaleImage = {
+    new GrayscaleImage(mag.data.zipWith(phase.data, (a, b) => {
+      if (a >= magnitude_threshold_) {
+          var angle = b
           if (angle >= 180) {
             angle -= 180 //Ignore polarity of the angle
           }
-          binaryGradient.data(i, j) = 1 << (angle / (180.0 / 8)).asInstanceOf[Int]
+          (1 << (angle / (180.0 / 8)).asInstanceOf[Int])
         }
-      }
-    }
-    binaryGradient
+      else 0
+    }))
   }
 
   // Filter out noisy gradients via non-max suppression in a 3x3 area.
-  def gradMorphology(binaryGradient: Image): Image = {
+  def gradMorphology(binaryGradient: GrayscaleImage): GrayscaleImage = {
     val rows = binaryGradient.rows
     val cols = binaryGradient.cols
     //Zero the borders -- they are unreliable
@@ -208,7 +205,7 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
       binaryGradient.data(y, cols - 1) = 0
     }
     //Now do non-max suppression. NOTE. Each pixel location contains just one orientation at this point
-    val cleanedGradient = new Image(rows, cols)
+    val cleanedGradient = new GrayscaleImage(rows, cols)
     val counts = Vector[Int](9) //9 places since we must also count zeros ... and ignore them.  That means that bit 1 falls into counts[1], 10 into counts[2] etc
     val index = Vector[Int](255) //This is just a table to translate 0001->1, 0010->2, 0100->3, 1000->4 and so on
     index(0) = 0 //Fill out this table Index to increments counts, counts how many times a 1 has been shifted
@@ -222,7 +219,7 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
     index(128) = 8
     val sft = Vector[Int](9) //OK, bear with me now. This table will translate from offset back to shift: 1->0001, 2->0010, 3->0100 and so on.
     var mask = 1
-    for (i <- 1 until 9) {
+    for (i <- 1 until 9) {   // sft(n) = 2^(n-1)
       sft(i) = mask
       mask = mask << 1
     }

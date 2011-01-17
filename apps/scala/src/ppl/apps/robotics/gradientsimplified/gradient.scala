@@ -11,7 +11,7 @@ object gradient extends DeliteApplication {
   def run(args: Array[String]) = {
 
     Delite.init = true
-    val image = Image.load(args(0))
+    val image = GrayscaleImage.load(args(0))
     val templateFiles = Vector[String]()
     new java.io.File(args(1)).getCanonicalFile.listFiles.map{
       file => templateFiles += file.getPath()

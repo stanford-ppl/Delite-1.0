@@ -3,8 +3,8 @@ package ppl.apps.robotics.gradientsimplified
 import ppl.delite.dsl.optiml._
 import ppl.delite.dsl.optiml.appinclude._
 
-class BinarizedGradientPyramid(gradientImage: Image) {
-  val pyramid = Vector[Image]()
+class BinarizedGradientPyramid(gradientImage: GrayscaleImage) {
+  val pyramid = Vector[GrayscaleImage]()
 
   val start_level = 3
   val levels = 1

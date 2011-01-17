@@ -385,7 +385,7 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
 //    detectionMsg.sizeHint(all_detections.length)
 //    for (i <- 0 until all_detections.length) {
 //      val tpl = all_detections(i).tpl
-//      val mask = new Image(tpl.rect.height, tpl.rect.width)
+//      val mask = new GrayscaleImage(tpl.rect.height, tpl.rect.width)
 //      for (j <- 0 until tpl.mask_list.length) {
 //        val x = tpl.mask_list(j) % tpl.rect.width
 //        val y = tpl.mask_list(j) / tpl.rect.width
@@ -430,7 +430,7 @@ def startTraining(name: String) = {
 	}
 }
 
-def trainInstance(img: Image, level: Int, pyr: BinarizedGradientPyramid, mask_pyr: BinarizedGradientPyramid, templates: Vector[BinarizedGradientTemplate], roi: Rect, mask: Image, template_radius: Float, accept_threshold: Float) = {
+def trainInstance(img: GrayscaleImage, level: Int, pyr: BinarizedGradientPyramid, mask_pyr: BinarizedGradientPyramid, templates: Vector[BinarizedGradientTemplate], roi: Rect, mask: GrayscaleImage, template_radius: Float, accept_threshold: Float) = {
 	BinarizedGradientTemplate bgt;
 	std::vector<BiGGDetection> detections;
 	float reduction_factor = float(1<<level);
