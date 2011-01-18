@@ -17,7 +17,7 @@ class BinarizedGradientPyramid(gradientImage: GrayscaleImage) {
       pyramid += crt
     }
     if (i != (start_level + levels - 1)) {
-      crt = crt.downsample()
+      crt = crt.bitwiseOrDownsample()
     }
   }
   pyramid.force // Necessary in 1.0 since lifted apply on generic vector isn't implemented

@@ -1,13 +1,15 @@
 package ppl.apps.robotics.gradientsimplified
 
-class BiGGDetection {
-	var name: String = null
-  var score: Float = 0.0f
-	var roi: Rect = null
-	var mask: GrayscaleImage = null
-	var index: Int = 0
-	var x: Int = 0
-  var y: Int = 0
-  var tpl: BinarizedGradientTemplate = null
-  var crt_tpl: BinarizedGradientTemplate = null
+class BiGGDetection(
+                     val name: String,
+                     val score: Float,
+                     val roi: Rect,
+                     val mask: GrayscaleImage,
+                     val index: Int,
+                     val x: Int,
+                     val y: Int,
+                     val tpl: BinarizedGradientTemplate,
+                     val crt_tpl: BinarizedGradientTemplate)
+{
+
 }

@@ -6,8 +6,7 @@ import ppl.delite.dsl.optiml.Precursors._
 import ppl.delite.metrics._
 import ppl.delite.core.appinclude._
 
-class BinarizedGradientGrid(modelFilenames: Vector[String]) {
-
+object BinarizedGradientGrid {
   // The radius of the template
   val template_radius_ = 15
 
@@ -20,78 +19,32 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   // Fraction overlap between two detections above which one of them is suppressed
   val fraction_overlap_ = 0.6f
 
-  val all_templates = Vector[Vector[BinarizedGradientTemplate]]()
-  val names = Vector[String]()
+  val borderPixels = 5
 
-  readModels()
-
-  // Loads pre-trained models
-  def readModels() = {
-    for(i <- 0 until modelFilenames.length) {
-      println("Loading model: " + modelFilenames(i))
-      val (name, templates) = ModelReader.loadModels(modelFilenames(i))
-      all_templates += templates
-      names += name
+  def apply(modelFilenames: Vector[String]) = {
+    val templates = modelFilenames.map { f =>
+      println("Loading model: " + f)
+      ModelReader.loadModels(f)
     }
-  }
-
-  // Runs the object detection of the current image.
-  def detectAllObjects(image: GrayscaleImage) = {
-    val img_gray = image // assuming image is single-channel. Needs to be made such if not.
-
-    val (mag, phase) = computeGradients(img_gray)
-    val binGrad = binarizeGradients(mag, phase)
-    val cleanGrad = gradMorphology(binGrad)
-
-    val pyr = new BinarizedGradientPyramid(cleanGrad)
-
-    val all_detections = Vector[BiGGDetection]()
-    var index = 0
-    all_templates.foreach {
-      root_templates =>
-        println(names(index) + ": Using " + root_templates.length + " templates")
-        val detections = detectSingleObject(pyr.getIndex(pyr.fixedLevelIndex), root_templates, template_radius_, pyr.fixedLevelIndex, accept_threshold_)
-        detections.force // Force the result for timing purposes
-        println(names(index) + ": Detections: " + detections.length)
-
-        detections.foreach {
-          detection =>
-            detection.name = names(index)
-        }
-        all_detections ++= detections
-        index += 1
-    }
-    all_detections.force // Force the result for timing purposes
-    val filteredDetections = nonMaxSuppress(all_detections, fraction_overlap_)
-    filteredDetections.force // Force the result for timing purposes
-    println("Total detections: " + filteredDetections.length)
+    new BinarizedGradientGrid(templates)
   }
 
   //Run detection for this object class.
-  def detectSingleObject(gradSummary: GrayscaleImage, templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
-    aggregate(5, gradSummary.rows - 5, 5, gradSummary.cols - 5) {
-      (x, y) => searchTemplates(gradSummary, x, y, template_radius, level, accept_threshold, templates)
+  def detectSingleObject(name: String, gradSummary: GrayscaleImage, templates: Vector[BinarizedGradientTemplate], template_radius: Int, level: Int, accept_threshold: Float): Vector[BiGGDetection] = {
+    aggregate(borderPixels, gradSummary.rows - borderPixels, borderPixels, gradSummary.cols - borderPixels) {
+      (x, y) => searchTemplates(name, gradSummary, x, y, template_radius, level, accept_threshold, templates)
     }
   }
 
-  def searchTemplates(gradSummary: GrayscaleImage, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
+  def searchTemplates(name: String, gradSummary: GrayscaleImage, x: Int, y: Int, template_radius: Int, level: Int, accept_threshold: Float, templates: Vector[BinarizedGradientTemplate]): Vector[BiGGDetection] = {
     val reduction_factor = (1 << level)
     val crt_template = fillTemplateFromGradientImage(gradSummary, x, y, template_radius, level)
     aggregate(0, templates.length) { j =>
-      val res = templates(j).score(crt_template, accept_threshold)
+      val res = BinarizedGradientTemplate.score(templates(j), crt_template, accept_threshold)
       if (res > accept_threshold) {
-        val detection = new BiGGDetection()
         val bbox = templates(j).rect
-
-        detection.roi = new Rect((reduction_factor * x - bbox.width / 2).asInstanceOf[Int], (reduction_factor * y - bbox.height / 2).asInstanceOf[Int], bbox.width, bbox.height)
-        detection.score = res
-        detection.index = j
-        detection.x = x
-        detection.y = y
-        detection.tpl = templates(j)
-        detection.crt_tpl = crt_template
-
-        Vector[BiGGDetection](detection)
+        val roi = new Rect((reduction_factor * x - bbox.width / 2).asInstanceOf[Int], (reduction_factor * y - bbox.height / 2).asInstanceOf[Int], bbox.width, bbox.height)
+        Vector[BiGGDetection](new BiGGDetection(name, res, roi, null, j, x, y, templates(j), crt_template))
       }
       else {
         Vector[BiGGDetection]()
@@ -102,43 +55,15 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
   // Construct a template from a region of a gradient summary image.
   def fillTemplateFromGradientImage(gradSummary: GrayscaleImage, xc: Int, yc: Int, r: Int, level: Int): BinarizedGradientTemplate = {
     val span = 2 * r
-    val tpl = new BinarizedGradientTemplate()
-    tpl.radius = r
-    tpl.level = level
-    tpl.binary_gradients = Vector[Int](span * span) //Create the template
-    tpl.match_list = Vector[Int]()
+    val tpl = new BinarizedGradientTemplate(r, null, null, level, Vector[Int](span * span), Vector[Int](), null, null, null)
 
     //Bear with me, we have to worry a bit about stepping off the image boundaries:
-    val rows = gradSummary.rows
-    val cols = gradSummary.cols
-    //y
-    var ystart = yc - r
-    var yoffset = 0 //offset before you reach the playing field
-    if (ystart < 0) {
-      yoffset = -ystart
-      ystart = 0
-    }
-    var yend = yc + r
-    if (yend > rows) {
-      yend = rows
-    }
+    val (xstart, xoffset) = if (xc - r < 0) (0, r - xc) else (xc - r, 0)
+    val xend = if (xc + r > gradSummary.cols) gradSummary.cols else xc + r
+    val (ystart, yoffset) = if (yc - r < 0) (0, r - yc) else (yc - r, 0)
+    val yend = if (yc + r > gradSummary.rows) gradSummary.rows else yc + r
 
-    //x
-    var xstart = xc - r
-    var xoffset = 0 //offset before you reach the playing field
-    if (xstart < 0) {
-      xoffset = -xstart
-      xstart = 0
-    }
-    var xend = xc + r
-    if (xend > cols) {
-      xend = cols
-    }
-
-    tpl.hist = Vector[Float](8)
-    var cnt = 0
-
-    //Fill the binary _gradients
+    //Fill the binary gradients
     for (y <- ystart until yend) {
       val imageRow = gradSummary.data(y)
       for (x <- xstart until xend) {
@@ -148,38 +73,14 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
           //Record where gradients are
           tpl.match_list += index
         }
-
-        for (i <- 0 until 8) {
-          if ((imageRow(x) & (1 << i)) > 0) {
-            tpl.hist(i) += 1
-            cnt += 1
-          }
-        }
       }
-    }
-
-    for (i <- 0 until 8) {
-      tpl.hist(i) /= cnt;
     }
     tpl
   }
 
-  // Compute magnitude and phase in degrees from single channel image
-  def computeGradients(img: GrayscaleImage): (ImageF, ImageF) = {
-    //Find X and Y gradients
-    val (x, y) = img.scharr
-    cartToPolar(x, y)
-  }
-
-  def cartToPolar(x: GrayscaleImage, y: GrayscaleImage): (ImageF, ImageF) = {
-    val mag = new ImageF(x.data.zipWith(y.data, (a, b) => math.sqrt(a*a + b*b).asInstanceOf[Float]))
-    val phase = new ImageF(x.data.zipWith(y.data, (a, b) => (math.atan2(b, a)*180/math.Pi).asInstanceOf[Float]).mmap(a => if (a < 0) a + 360 else a))
-    (mag, phase)
-  }
-
   //Turn mag and phase into a binary representation of 8 gradient directions.
-  def binarizeGradients(mag: ImageF, phase: ImageF): GrayscaleImage = {
-    new GrayscaleImage(mag.data.zipWith(phase.data, (a, b) => {
+  def binarizeGradients(mag: Matrix[Float], phase: Matrix[Float]): GrayscaleImage = {
+    new GrayscaleImage(mag.zipWith(phase, (a, b) => {
       if (a >= magnitude_threshold_) {
           var angle = b
           if (angle >= 180) {
@@ -293,16 +194,33 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
    * detections: vector of detections to work with
    * frac_overlap: what fraction of overlap between 2 rectangles constitutes overlap
    */
-  def nonMaxSuppress(detections: Vector[BiGGDetection], frac_overlap: Float): Vector[BiGGDetection] = {
+  def nonMaxSuppress(detections: Vector[BiGGDetection], overlapThreshold: Float): Vector[BiGGDetection] = {
     var len = detections.length
 
+//    detections filter { d1 =>
+//      var isMax = true
+//      var d2Index = 0
+//      while (d2Index < detections.length) {
+//        val d2 = detections(d2Index)
+//        if (d1 != d2) {
+//          val measuredOverlap = rectFractOverlap(d1.roi, d2.roi)
+//          if (measuredOverlap > overlapThreshold) {
+//            if (d1.score < d2.score) {
+//              isMax = false
+//            }
+//          }
+//        }
+//        d2Index += 1
+//      }
+//      isMax
+//    }
     var i = 0
     while (i < len - 1) {
       var j = i + 1
       var iMoved = false
       while (j < len && iMoved == false) {
         val measured_frac_overlap = rectFractOverlap(detections(i).roi, detections(j).roi)
-        if (measured_frac_overlap > frac_overlap) {
+        if (measured_frac_overlap > overlapThreshold) {
           if (detections(i).score >= detections(j).score) {
             val temp = detections(len - 1)
             detections(len - 1) = detections(j)
@@ -324,5 +242,32 @@ class BinarizedGradientGrid(modelFilenames: Vector[String]) {
       i += 1
     }
     detections.take(len)
+  }
+}
+
+class BinarizedGradientGrid(all_templates: Vector[(String, Vector[BinarizedGradientTemplate])]) {
+  import BinarizedGradientGrid._
+  // Runs the object detection of the current image.
+  def detectAllObjects(image: GrayscaleImage) = {
+    val img_gray = image // assuming image is single-channel. Needs to be made such if not.
+
+    val (mag, phase) = img_gray.gradients(true)
+    val binGrad = binarizeGradients(mag, phase)
+    val cleanGrad = gradMorphology(binGrad)
+
+    val pyr = new BinarizedGradientPyramid(cleanGrad)
+
+    val all_detections = all_templates.flatMap { t =>
+      val (name, templates) = t
+      println(name + ": Using " + templates.length + " templates")
+      val detections = detectSingleObject(name, pyr.getIndex(pyr.fixedLevelIndex), templates, template_radius_, pyr.fixedLevelIndex, accept_threshold_)
+      detections.force // Force the result for timing purposes
+      println(name + ": Detections: " + detections.length)
+      detections
+    }
+    all_detections.force // Force the result for timing purposes
+    val filteredDetections = nonMaxSuppress(all_detections, fraction_overlap_)
+    filteredDetections.force // Force the result for timing purposes
+    println("Total detections: " + filteredDetections.length)
   }
 }

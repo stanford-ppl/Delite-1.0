@@ -24,8 +24,6 @@ object ModelReader {
   }
 
   private def loadModel(file: BufferedReader): BinarizedGradientTemplate = {
-    val template = new BinarizedGradientTemplate()
-
     if (file.readLine().trim != "====OneBiGG====:") throw new RuntimeException("Illegal data format")
     var temp = file.readLine().trim.split(" ")
     if (temp(0) != "view/radius/reduction:") throw new RuntimeException("Illegal data format")
@@ -66,12 +64,6 @@ object ModelReader {
     val height = Integer.parseInt(bbString(3))
     val bb = new Rect(x, y, width, height)
 
-    template.radius = radius
-    template.binary_gradients = gradients
-    template.match_list = matchList
-    template.occlusions = occlusions
-    template.rect = bb
-
-    template
+    new BinarizedGradientTemplate(radius, bb, null, 0, gradients, matchList, occlusions, null, null)
   }
 }

@@ -17,7 +17,7 @@ object gradient extends DeliteApplication {
       file => templateFiles += file.getPath()
     }
 
-    val bigg = new BinarizedGradientGrid(templateFiles)
+    val bigg = BinarizedGradientGrid(templateFiles)
     Delite.init = false
 
     var numTimes = 10
