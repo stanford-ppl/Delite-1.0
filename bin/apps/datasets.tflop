@@ -31,3 +31,6 @@ svmrelaxed40|$data/ml/svm/MATRIX.TRAIN.800|$data/ml/svm/MATRIX.TEST|output|10
 svmrelaxed50|$data/ml/svm/MATRIX.TRAIN.800|$data/ml/svm/MATRIX.TEST|output|10
 svmrelaxed90|$data/ml/svm/MATRIX.TRAIN.800|$data/ml/svm/MATRIX.TEST|output|10
 svmrelaxed100|$data/ml/svm/MATRIX.TRAIN.800|$data/ml/svm/MATRIX.TEST|output|10
+gradient|$data/robotics/gradient/cokeImage.dat|$data/robotics/gradient/templates|
+autoencoder|$data/ml/autoencoder/naturalimages.dat|100|100|50|
+flatmaptest|1024|1000000
