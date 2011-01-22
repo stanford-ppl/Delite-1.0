@@ -10,7 +10,7 @@ class Image[T] extends Matrix[T] {
     while (row < output.numRows) {
       var col = 0
       while (col < output.numCols) {
-        output(row, col) = block(data.slice2d(rowFactor * row, rowFactor * row + rowFactor - 1, colFactor * col, colFactor * col + colFactor - 1))
+        output(row, col) = block(data.slice2d(rowFactor * row, rowFactor * row + rowFactor, colFactor * col, colFactor * col + colFactor))
         col += 1
       }
       row += 1

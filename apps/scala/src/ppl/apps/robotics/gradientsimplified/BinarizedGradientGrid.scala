@@ -268,6 +268,6 @@ class BinarizedGradientGrid(all_templates: Vector[(String, Vector[BinarizedGradi
     all_detections.force // Force the result for timing purposes
     val filteredDetections = nonMaxSuppress(all_detections, fraction_overlap_)
     filteredDetections.force // Force the result for timing purposes
-    println("Total detections: " + filteredDetections.length)
+    println("-----> Total detections: " + filteredDetections.length)
   }
 }

@@ -369,6 +369,26 @@ object Matrix {
     }
   }
 
+  protected[optiml] case class OP_slice2d[A](m: Matrix[A], beginrow: Int, endrow: Int, begincol: Int, endcol: Int)(implicit c: ClassManifest[A])
+    extends DeliteOP_SingleTask[Matrix[A]] {
+
+    def task = {
+      m.chkRange(beginrow, endrow)
+      // Add check for col out of bounds
+      val out = newMatrix[A](endrow-beginrow, endcol-begincol)
+      var i = beginrow
+      while (i < endrow) {
+        var j = begincol
+        while (j < endcol) {
+          out(i-beginrow, j-begincol) = m(i,j)
+          j += 1
+        }
+        i += 1
+      }
+      out
+    }
+  }
+
   protected[optiml] case class OP_updateRow[A](m: Matrix[A], row: Int, x: Vector[A])
     extends DeliteOP_MutableSingleTask[DeliteUnit](x)(m) {
 
@@ -856,6 +876,10 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     run(OP_sliceRows(this,begin,end))
   }
 
+  def slice2d(beginrow: Int, endrow: Int, begincol: Int, endcol: Int)(implicit c: ClassManifest[T]): Matrix[T] = {
+    run(OP_slice2d(this,beginrow,endrow,begincol,endcol))
+  }
+
   //def sliceRows(indices: IndexVector) : Matrix[T]
 
   ///////////////
@@ -1200,6 +1224,29 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
       }
     }
     m
+  }
+
+//  def convolve[B <: DeliteDSLType](kernel: Matrix[T])(implicit ops: ArithOps[T], conv: T => B, pfact: DeliteProxyFactory[B], c: ClassManifest[T], cb: ClassManifest[B]): Matrix[B] = {
+//    windowedFilter(kernel.numRows, kernel.numCols) { slice =>
+//      (slice dot kernel).sum[B]
+//    }
+//  }
+
+  def windowedFilter[B](sliceRows: Int, sliceCols: Int)(block: Matrix[T] => B)(implicit c: ClassManifest[T], cb: ClassManifest[B]) : Matrix[B] = {
+    // Need to enforce odd values for sliceRows and sliceCols
+    val rowOffset = (sliceRows - 1) / 2
+    val colOffset = (sliceCols - 1) / 2
+    val output = Matrix[B](numRows, numCols)
+    var row = rowOffset
+    while (row < numRows - rowOffset) {
+      var col = colOffset
+      while (col < numCols - colOffset) {
+        output(row, col) = block(slice2d(row - rowOffset, row + rowOffset, col - colOffset, col + colOffset))
+        col += 1
+      }
+      row += 1
+    }
+    output
   }
 
   //def precumulate(identity: Vector[T])(func: (Vector[T],Vector[T]) => Vector[T]): (Vector[T],Vector[Vector[T]]) =

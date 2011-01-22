@@ -1,8 +1,10 @@
 package ppl.apps.robotics.gradientsimplified
 
+import ppl.delite.core.appinclude._
 import ppl.delite.dsl.optiml._
 import ppl.delite.dsl.optiml.appinclude._
 import ppl.delite.dsl.optiml.Precursors._
+import ppl.delite.dsl.primitive._
 import java.io.{BufferedReader, FileReader}
 
 // single-channel image
@@ -20,26 +22,54 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
     data.getRow(row)
   }
 
-  def bitwiseOrDownsample(): GrayscaleImage = {
-    val downsampled = new GrayscaleImage(rows / 2, cols / 2)
+//  def bitwiseOrDownsample(): GrayscaleImage = {
+//    val downsampled = new GrayscaleImage(rows / 2, cols / 2)
+//
+//    for (i <- 0 until downsampled.rows) {
+//      for (j <- 0 until downsampled.cols) {
+//        downsampled.data(i, j) = data(2*i, 2*j) | data(2*i + 1, 2*j) | data(2*i, 2*j + 1) | data(2*i + 1, 2*j + 1)
+//      }
+//    }
+//    downsampled
+//  }
 
-    for (i <- 0 until downsampled.rows) {
-      for (j <- 0 until downsampled.cols) {
-        downsampled.data(i, j) = data(2*i, 2*j) | data(2*i + 1, 2*j) | data(2*i, 2*j + 1) | data(2*i + 1, 2*j + 1)
+  def bitwiseOrDownsample(): GrayscaleImage = {
+    new GrayscaleImage(downsample(2, 2) { slice =>
+      slice(0, 0) | slice(1, 0) | slice(0, 1) | slice(1, 1)
+    })
+  }
+
+  def downsample(rowFactor: Int, colFactor: Int)(block: Matrix[Int] => Int): Matrix[Int] = {
+    val output = Matrix[Int](data.numRows / rowFactor, data.numCols / colFactor)
+    var row = 0
+    while (row < output.numRows) {
+      var col = 0
+      while (col < output.numCols) {
+        val slice = data.slice2d(rowFactor * row, rowFactor * row + rowFactor, colFactor * col, colFactor * col + colFactor)
+        slice.force // Necessary in 1.0 due to generic apply
+        output(row, col) = block(slice)
+        col += 1
       }
+      row += 1
     }
-    downsampled
+    output
   }
 
   val scharrYkernel = Matrix[Int](Vector[Int](-3, -10, -3), Vector[Int](0, 0, 0), Vector[Int](3, 10, 3))
   val scharrXkernel = scharrYkernel.trans
 
   // Compute Scharr magnitude and phase in degrees from single channel image
-  def gradients(polar: Boolean = false)(implicit pFact: Matrix.ProxyFactory[Float]): (Matrix[Float], Matrix[Float]) = {
+  def gradients(polar: Boolean = false): (Matrix[Float], Matrix[Float]) = {
     //Find X and Y gradients
     val x = conv3x3(scharrXkernel)
     val y = conv3x3(scharrYkernel)
-    if (polar) cartToPolar(x, y) else (x.data.toFloat, y.data.toFloat)
+    if (polar) cartToPolar(x, y) else (x, y)
+  }
+
+  def convolve(kernel: Matrix[Int]): Matrix[Int] = {
+    data.windowedFilter(kernel.numRows, kernel.numCols) { slice =>
+      (slice dot kernel).sum[DeliteInt]
+    }
   }
 
   def conv3x3(kernel: Matrix[Int]) = {
@@ -52,14 +82,16 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
                 kernel(2, 0) * data(i + 1, j - 1) + kernel(2, 1) * data(i + 1, j) + kernel(2, 2) * data(i + 1, j + 1)
       }
     }
-    filtered
+    filtered.data
   }
+
+
 }
 
 object GrayscaleImage {
-  def cartToPolar(x: GrayscaleImage, y: GrayscaleImage)(implicit pFact: Matrix.ProxyFactory[Float]): (Matrix[Float], Matrix[Float]) = {
-    val mag = x.data.zipWith(y.data, (a, b) => math.sqrt(a*a + b*b).asInstanceOf[Float])
-    val phase = x.data.zipWith(y.data, (a, b) => (math.atan2(b, a)*180/math.Pi).asInstanceOf[Float]).mmap(a => if (a < 0) a + 360 else a)
+  def cartToPolar(x: Matrix[Float], y: Matrix[Float]): (Matrix[Float], Matrix[Float]) = {
+    val mag = x.zipWith(y, (a, b) => math.sqrt(a*a + b*b).asInstanceOf[Float])
+    val phase = x.zipWith(y, (a, b) => (math.atan2(b, a)*180/math.Pi).asInstanceOf[Float]).mmap(a => if (a < 0) a + 360 else a)
     (mag, phase)
   }
 
