@@ -1241,7 +1241,7 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     while (row < numRows - rowOffset) {
       var col = colOffset
       while (col < numCols - colOffset) {
-        output(row, col) = block(slice2d(row - rowOffset, row + rowOffset, col - colOffset, col + colOffset))
+        output(row, col) = block(slice2d(row - rowOffset, row + rowOffset + 1, col - colOffset, col + colOffset + 1))
         col += 1
       }
       row += 1

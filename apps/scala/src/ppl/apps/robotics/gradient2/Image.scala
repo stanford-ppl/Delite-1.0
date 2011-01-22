@@ -18,20 +18,20 @@ class Image[T] extends Matrix[T] {
     new Image[T](output)
   }
 
-  def windowedFilter(sliceRows: Int, sliceCols: Int)(block: Matrix[T] => T) : Image[T] = {
+  def windowedFilter[B](sliceRows: Int, sliceCols: Int)(block: Matrix[T] => B) : Image[B] = {
     // Need to enforce odd values for sliceRows and sliceCols
     val rowOffset = (sliceRows - 1) / 2
     val colOffset = (sliceCols - 1) / 2
-    val output = Matrix[T](data.numRows, data.numCols)
+    val output = Matrix[B](numRows, numCols)
     var row = rowOffset
-    while (row < data.numRows - rowOffset) {
+    while (row < numRows - rowOffset) {
       var col = colOffset
-      while (col < data.numCols - colOffset) {
-        output(row, col) = block(data.slice2d(row - rowOffset, row + rowOffset, col - colOffset, col + colOffset))
+      while (col < numCols - colOffset) {
+        output(row, col) = block(slice2d(row - rowOffset, row + rowOffset + 1, col - colOffset, col + colOffset + 1))
         col += 1
       }
       row += 1
     }
-    new Image[T](output)
+    new Image[B](output)
   }
 }
