@@ -61,8 +61,8 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
   // Compute Scharr magnitude and phase in degrees from single channel image
   def gradients(polar: Boolean = false): (Matrix[Float], Matrix[Float]) = {
     //Find X and Y gradients
-    val x = conv3x3(scharrXkernel)
-    val y = conv3x3(scharrYkernel)
+    val x = convolve(scharrXkernel)
+    val y = convolve(scharrYkernel)
     if (polar) cartToPolar(x, y) else (x, y)
   }
 
@@ -72,18 +72,18 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
     }
   }
 
-  def conv3x3(kernel: Matrix[Int]) = {
-    val filtered = new GrayscaleImage(rows, cols)
-    for (i <- 1 until rows - 1) {
-      for (j <- 1 until cols - 1) {
-        filtered.data(i, j) =
-                kernel(0, 0) * data(i - 1, j - 1) + kernel(0, 1) * data(i - 1, j) + kernel(0, 2) * data(i - 1, j + 1) +
-                kernel(1, 0) * data(i    , j - 1) + kernel(1, 1) * data(i    , j) + kernel(1, 2) * data(i    , j + 1) +
-                kernel(2, 0) * data(i + 1, j - 1) + kernel(2, 1) * data(i + 1, j) + kernel(2, 2) * data(i + 1, j + 1)
-      }
-    }
-    filtered.data
-  }
+//  def conv3x3(kernel: Matrix[Int]) = {
+//    val filtered = new GrayscaleImage(rows, cols)
+//    for (i <- 1 until rows - 1) {
+//      for (j <- 1 until cols - 1) {
+//        filtered.data(i, j) =
+//                kernel(0, 0) * data(i - 1, j - 1) + kernel(0, 1) * data(i - 1, j) + kernel(0, 2) * data(i - 1, j + 1) +
+//                kernel(1, 0) * data(i    , j - 1) + kernel(1, 1) * data(i    , j) + kernel(1, 2) * data(i    , j + 1) +
+//                kernel(2, 0) * data(i + 1, j - 1) + kernel(2, 1) * data(i + 1, j) + kernel(2, 2) * data(i + 1, j + 1)
+//      }
+//    }
+//    filtered.data
+//  }
 
 
 }
