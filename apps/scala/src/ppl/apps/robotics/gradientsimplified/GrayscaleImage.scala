@@ -22,17 +22,6 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
     data.getRow(row)
   }
 
-//  def bitwiseOrDownsample(): GrayscaleImage = {
-//    val downsampled = new GrayscaleImage(rows / 2, cols / 2)
-//
-//    for (i <- 0 until downsampled.rows) {
-//      for (j <- 0 until downsampled.cols) {
-//        downsampled.data(i, j) = data(2*i, 2*j) | data(2*i + 1, 2*j) | data(2*i, 2*j + 1) | data(2*i + 1, 2*j + 1)
-//      }
-//    }
-//    downsampled
-//  }
-
   def bitwiseOrDownsample(): GrayscaleImage = {
     new GrayscaleImage(downsample(2, 2) { slice =>
       slice(0, 0) | slice(1, 0) | slice(0, 1) | slice(1, 1)
@@ -40,19 +29,11 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
   }
 
   def downsample(rowFactor: Int, colFactor: Int)(block: Matrix[Int] => Int): Matrix[Int] = {
-    val output = Matrix[Int](data.numRows / rowFactor, data.numCols / colFactor)
-    var row = 0
-    while (row < output.numRows) {
-      var col = 0
-      while (col < output.numCols) {
-        val slice = data.slice2d(rowFactor * row, rowFactor * row + rowFactor, colFactor * col, colFactor * col + colFactor)
-        slice.force // Necessary in 1.0 due to generic apply
-        output(row, col) = block(slice)
-        col += 1
-      }
-      row += 1
+    (0 :: data.numRows / rowFactor, 0 :: data.numCols / colFactor) { (row, col) =>
+      val slice = data.slice2d(rowFactor * row, rowFactor * row + rowFactor, colFactor * col, colFactor * col + colFactor)
+      slice.force // Necessary in 1.0 due to generic apply
+      block(slice)
     }
-    output
   }
 
   val scharrYkernel = Matrix[Int](Vector[Int](-3, -10, -3), Vector[Int](0, 0, 0), Vector[Int](3, 10, 3))
@@ -69,23 +50,12 @@ class GrayscaleImage(val rows: Int, val cols: Int, val data: Matrix[Int]) {
   def convolve(kernel: Matrix[Int]): Matrix[Int] = {
     data.windowedFilter(kernel.numRows, kernel.numCols) { slice =>
       (slice dot kernel).sum[DeliteInt]
+      // The hardcoded version is almost twice as fast in 1.0.  Need to improve overheads!
+//      kernel(0, 0) * slice(0, 0) + kernel(0, 1) * slice(0, 1) + kernel(0, 2) * slice(0, 2) +
+//        kernel(1, 0) * slice(1, 0) + kernel(1, 1) * slice(1, 1) + kernel(1, 2) * slice(1, 2) +
+//        kernel(2, 0) * slice(2, 0) + kernel(2, 1) * slice(2, 1) + kernel(2, 2) * slice(2, 2)
     }
   }
-
-//  def conv3x3(kernel: Matrix[Int]) = {
-//    val filtered = new GrayscaleImage(rows, cols)
-//    for (i <- 1 until rows - 1) {
-//      for (j <- 1 until cols - 1) {
-//        filtered.data(i, j) =
-//                kernel(0, 0) * data(i - 1, j - 1) + kernel(0, 1) * data(i - 1, j) + kernel(0, 2) * data(i - 1, j + 1) +
-//                kernel(1, 0) * data(i    , j - 1) + kernel(1, 1) * data(i    , j) + kernel(1, 2) * data(i    , j + 1) +
-//                kernel(2, 0) * data(i + 1, j - 1) + kernel(2, 1) * data(i + 1, j) + kernel(2, 2) * data(i + 1, j + 1)
-//      }
-//    }
-//    filtered.data
-//  }
-
-
 }
 
 object GrayscaleImage {

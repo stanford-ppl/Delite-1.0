@@ -1236,17 +1236,13 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     // Need to enforce odd values for sliceRows and sliceCols
     val rowOffset = (sliceRows - 1) / 2
     val colOffset = (sliceCols - 1) / 2
-    val output = Matrix[B](numRows, numCols)
-    var row = rowOffset
-    while (row < numRows - rowOffset) {
-      var col = colOffset
-      while (col < numCols - colOffset) {
-        output(row, col) = block(slice2d(row - rowOffset, row + rowOffset + 1, col - colOffset, col + colOffset + 1))
-        col += 1
+    (0 :: numRows, 0 :: numCols) { (row, col) =>
+      if ((row >= rowOffset) && (row < numRows - rowOffset) && (col >= colOffset) && (col < numCols - colOffset)) {
+        block(slice2d(row - rowOffset, row + rowOffset + 1, col - colOffset, col + colOffset + 1))
+      } else {
+        0.asInstanceOf[B]
       }
-      row += 1
     }
-    output
   }
 
   //def precumulate(identity: Vector[T])(func: (Vector[T],Vector[T]) => Vector[T]): (Vector[T],Vector[Vector[T]]) =
