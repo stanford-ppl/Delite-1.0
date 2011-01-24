@@ -16,9 +16,9 @@ class IndexVector2  {
 
     // _indRow means this IndexVector represents the rows of a Matrix, so it should be stored as a column vector
     _indRow = rows
-    if (_indRow.is_row)  _indRow = _indRow.trans.asInstanceOf[IndexVector]
+    if (_indRow.is_row)  _indRow = _indRow.mtrans.asInstanceOf[IndexVector]
     _indCol = cols
-    if (!_indCol.is_row) _indCol = _indCol.trans.asInstanceOf[IndexVector]
+    if (!_indCol.is_row) _indCol = _indCol.mtrans.asInstanceOf[IndexVector]
   }
 
   /**

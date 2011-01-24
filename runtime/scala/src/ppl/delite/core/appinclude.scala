@@ -32,7 +32,7 @@ object appinclude {
 
   implicit def vecBuilder : Vector.Builder = new Vector.Builder
   implicit def vecProxyFactory[A : ClassManifest]: Vector.ProxyFactory[A] = new Vector.ProxyFactory[A]
-  //implicit def vecVecProxyFactory[A : ClassManifest]: Vector.ProxyFactory[Vector[A]] = new Vector.ProxyFactory[Vector[A]]{}
+  implicit def vecVecProxyFactory[A : ClassManifest]: Vector.ProxyFactory[Vector[A]] = new Vector.ProxyFactory[Vector[A]]{}
   //implicit val vecVec_ProxyFactory: Vector.ProxyFactory[Vector[_]] = vecProxyFactory[Vector[_]]
   implicit val doubleVecProxyFactory: Vector.ProxyFactory[Double] = vecProxyFactory[Double]
   implicit val floatVecProxyFactory: Vector.ProxyFactory[Float] = vecProxyFactory[Float]
