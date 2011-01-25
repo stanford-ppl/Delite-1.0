@@ -18,12 +18,12 @@ class GrayscaleImage extends Image[Int] {
     //Find X and Y gradients
     val x = convolve(scharrXkernel)
     val y = convolve(scharrYkernel)
-    if (polar) cartToPolar(x, y) else (x.toFloat, y.toFloat)
+    if (polar) cartToPolar(x, y) else (x, y)
   }
 
   def convolve(kernel: Matrix[Int]): GrayscaleImage = {
     windowedFilter(data, kernel.numRows, kernel.numCols) { slice =>
-      slice dot kernel
+      (slice dot kernel).sum
     }
   }
 }
