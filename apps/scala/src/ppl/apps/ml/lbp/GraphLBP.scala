@@ -112,7 +112,7 @@ object GraphLBP extends DeliteApplication {
 
    //var count = 1
 
-    g.untilConvergedTask(Consistency.Edge) {
+    g.untilConvergedData2(Consistency.Edge) {
       v =>
       // Flip messages on in edges
         for (e <- v.edges) {

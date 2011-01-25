@@ -1,7 +1,7 @@
 function exectime = runlinreg(gpu)
 addpath linreg
-xfile = '../../data/ml/linreg/x-1024.dat';
-yfile = '../../data/ml/linreg/y-1024.dat';
+xfile = '/kunle/ppl/delite/data/ml/linreg/x-2048.dat';
+yfile = '/kunle/ppl/delite/data/ml/linreg/y-2048.dat';
 if (gpu == 1)
     exectime = linreggpu(xfile, yfile);
 elseif (gpu == 2)

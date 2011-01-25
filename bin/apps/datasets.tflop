@@ -12,7 +12,7 @@ kmeansgpu|$data/ml/kmeans/mandrill-large.dat|$data/ml/kmeans/initmu.dat
 kmeansbaseline|$data/ml/kmeans/mandrill-large.dat|$data/ml/kmeans/initmu.dat
 kmeansbesteffort|$data/ml/kmeans/mandrill-large.dat|$data/ml/kmeans/initmu.dat
 graphlbpbaseline|
-graphlbp|
+graphlbp|200 200
 lbp|$data/ml/lbp/onlyedges1|$data/ml/lbp/graphprint1
 lbpgpu|$data/ml/lbp/onlyedges1|$data/ml/lbp/graphprint1
 lbpbaseline|$data/ml/lbp/onlyedges1|$data/ml/lbp/graphprint1

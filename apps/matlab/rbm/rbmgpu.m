@@ -57,8 +57,9 @@ for epoch = 1:maxepoch,
 
 %%%%%%%%% START POSITIVE PHASE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   data = gpuArray(trainingdata(((batch - 1) * numcases + 1):(batch * numcases), :));
-  poshidprobs = 1./(1 + exp(-data*vishid - repmat(hidbiases,numcases,1)));    
-  posprods    = data' * poshidprobs;
+  poshidprobs = 1./(1 + exp(-data*vishid - repmat(hidbiases,numcases,1)));
+  temp = data'    
+  posprods    = temp * poshidprobs;
   poshidact   = sum(gather(poshidprobs));
   posvisact = sum(gather(data));
 

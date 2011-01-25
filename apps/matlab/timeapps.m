@@ -9,7 +9,8 @@ else
 end
 
 if (strcmpi(app, 'all'))
-	apps = {'gda', 'nb', 'linreg', 'kmeans', 'svm', 'lbp', 'matmult' 'rbm'};
+%	apps = {'gda', 'nb', 'linreg', 'kmeans', 'svm', 'lbp', 'matmult' 'rbm'};
+       apps = {'linreg', 'kmeans', 'svm', 'lbp', 'matmult'};
 else
 	apps = {app};
 end

@@ -196,6 +196,31 @@ trait Graph[V, E] extends DeliteDSLType {
     }
   }
 
+  def untilConvergedData2(c: Consistency.Consistency)(f: (Graph[V, E]#Vertex) => Unit)(implicit mV: ClassManifest[V]): Unit = {
+    if(!sorted) {
+      sort()
+    }
+
+    // Ugh
+    implicit val proxyFactory = new Vector.ProxyFactory[V]
+
+    // List of locks
+    val locks = new ConcurrentHashMap[V, ReentrantReadWriteLock]
+
+    // Copy all vertices over into starting list
+    var vertices = Vector[V](vertexList.length)
+
+    var i = 0
+    for(v <- vertexList) {
+      vertices(i) = v
+      i += 1
+    }
+
+    while (!vertices.isEmpty) {
+      vertices = Delite.run(new GraphOP_untilConvergedData2[V,E](this, c, vertices, f, locks))
+    }
+  }
+
   def fullVertices(v: Vertex): Seq[V] = {
     val sorted = new ArrayBuffer[V](v.neighbors.size + 1)
 
