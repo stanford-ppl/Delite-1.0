@@ -675,7 +675,20 @@ object IntVector {
   }
   */
 
-  
+  protected[optiml] case class OP_sort(val coll: IntVector)
+    extends DeliteOP_SingleTask[Vector[Int]](coll) {
+
+    def task = {
+      // in scala.util.Sorting.quickSort, coll._data.length is used
+      if(coll._length != coll._data.length){
+        val d = new Array[Int](coll._length)
+        Array.copy(coll._data, 0, d, 0, coll._length)
+        coll._data = d
+      }
+      scala.util.Sorting.quickSort(coll._data)
+      coll
+    }
+  }
 
 }
 
@@ -852,5 +865,8 @@ trait IntVector extends Vector[Int] {
     else
       run(OP_REPMAT(this, i, j))
   }
-  
+
+  override def sort(implicit cmp: Int => Ordered[Int], pfact: DeliteProxyFactory[Vector[Int]]) : Vector[Int] = {
+    run(OP_sort(this))(pfact)
+  }
 }

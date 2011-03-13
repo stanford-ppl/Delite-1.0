@@ -1175,6 +1175,8 @@ trait DoubleMatrix extends Matrix[Double] {
   override def lifted_update(row: Int, col:Int, x: Double) : Unit = {
     run(OP_update(this,row,col,x))
   }
+  
+  override def dist(i:Int, j:Int): Double
 
   override def dc_update(i: Int, x: Double)
   override def dc_apply(i: Int) : Double    

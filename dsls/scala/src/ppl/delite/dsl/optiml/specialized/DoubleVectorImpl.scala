@@ -14,8 +14,8 @@ import ppl.delite.core.include._
 import ppl.delite.core.appinclude._
 import ppl.delite.nativeGPU.GPUable
 import ppl.delite.dsl.optiml.{Matrix, ArithOps, Vector}
-import ppl.delite.core.ops.{DeliteOP_MutableSingleTask, DeliteOP_SingleTask}
-import ppl.delite.core.DeliteCore
+import ppl.delite.core.ops.{DeliteOP_Map, DeliteOP_MutableSingleTask, DeliteOP_SingleTask}
+import ppl.delite.core.{DeliteProxyFactory, DeliteCore}
 
 object DoubleVectorImpl {
   protected[optiml] case class OP_plusEquals[A <: Double](v: DoubleVectorImpl, x: A)
@@ -95,6 +95,16 @@ object DoubleVectorImpl {
     }
 
   }
+
+  protected[optiml] case class OP_map[B : ClassManifest](val coll: Vector[Double], val out: Vector[B], val func: Double => B)
+    extends DeliteOP_Map[Double,B,Vector]
+
+  protected[optiml] case class OP_alloc[B: ClassManifest](orig: Vector[Double]) extends DeliteOP_SingleTask[Vector[B]](orig) {
+    def task = {
+      Vector[B](orig.is_row, orig.length)
+    }
+  }
+
 }
 
 private[optiml] class DoubleVectorImpl extends DoubleVector with GPUable[Double] {
@@ -114,6 +124,7 @@ private[optiml] class DoubleVectorImpl extends DoubleVector with GPUable[Double]
 	  _data = data
 	  _length = len
 	  _is_row = row_vec
+    cvalue = this
     isComputed = true
   }
 
@@ -140,6 +151,15 @@ private[optiml] class DoubleVectorImpl extends DoubleVector with GPUable[Double]
   override var _is_row = false
   override protected var _frozen = false
 
+  // for streaming use
+  var _matrix: Matrix[Double] = null
+  var _index: Int = -1
+  var _is_streaming = false
+  var _is_initialized = false
+
+  override def matrix = _matrix
+  override def index = _index
+  
   //////////////
   // GPUable
   protected[delite] def gpu_data = _data
@@ -225,5 +245,34 @@ private[optiml] class DoubleVectorImpl extends DoubleVector with GPUable[Double]
     Array.copy(_data, pos, _data, pos + len, _length - pos)
     _length += len
   }
+
+  protected def initialize() {
+    _matrix.initRow(_index)
+    _is_initialized = true
+    // println("initialize row "+_index)
+  }
+  
+  override def map[B](f: Double => B)(implicit pFact: DeliteProxyFactory[Vector[B]], c: ClassManifest[B]): Vector[B] = {
+    if(_is_streaming && !_is_initialized)  initialize
+    run(OP_map[B](this, run(OP_alloc[B](this)), f))
+  }
+
+  override def find(pred:Double => Boolean):Vector[Int] = {
+    if(_is_streaming && !_is_initialized)  initialize
+    val len = length
+    var out = Vector[Int](0)
+    var i = 0
+    while(i < len){
+      if(pred(this.apply(i))) out += i
+      i += 1
+    }
+    out
+  }
+
+  override def index_= (i: Int){
+    _index = i
+  }
+
+  override def data = this._data
 
 }

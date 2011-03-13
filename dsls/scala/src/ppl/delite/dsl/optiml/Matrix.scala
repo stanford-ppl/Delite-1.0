@@ -24,10 +24,14 @@ import ppl.delite.cuda._
 import ppl.delite.cnative._
 
 object Matrix {
+
+  val numTrunks = 1024
+
   // user visible methods
   def apply[A : ClassManifest](xs: Vector[Vector[A]]) = newMatrix(xs)
   def apply[A : ClassManifest](xs: Vector[A]*) = newMatrix(Vector(xs: _*))
   def apply[A : ClassManifest](numRows: Int, numCols: Int) = newMatrix[A](numRows,numCols)
+  def apply[A : ClassManifest](numRows: Int, numCols: Int, block:(Int,Int) => A) = newStreamingMatrix[A](numRows,numCols,block)
 
   // special apply method for GPU use (Generate Impl with given array and given row/col 
   def apply[A : ClassManifest](xs: Array[A], numRows: Int, numCols: Int) = newMatrix[A](xs, numRows, numCols)
@@ -96,6 +100,13 @@ object Matrix {
       case ClassManifest.Long => new LongMatrixImpl(numRows, numCols).asInstanceOf[Matrix[A]]
       case ClassManifest.Boolean => new BooleanMatrixImpl(numRows, numCols).asInstanceOf[Matrix[A]]
       case _ => new MatrixImpl[A](numRows, numCols)
+    }
+  }
+
+  private def newStreamingMatrix[A](numRows: Int, numCols: Int, block:(Int,Int) => A)(implicit m: ClassManifest[A]): Matrix[A] = {
+    m match {
+      case ClassManifest.Double => new StreamingDoubleMatrixImpl(numRows, numCols, block.asInstanceOf[(Int,Int)=>Double], numTrunks).asInstanceOf[Matrix[A]]
+      case _=> throw new UnsupportedOperationException("No StreamingMatrixImpl for the given type")
     }
   }
 
@@ -840,6 +851,10 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
   def lifted_apply(i: Int, j: Int) : T
   def apply(i: Int, j: Int) : T
 
+  def initialize(row:Int, col:Int):T = {
+    throw new UnsupportedOperationException("initialize of Matrix[T]")
+  }
+  
   def flattened(i: Int) : T = dc_apply(i)
 
   // should be frozen if matrix is frozen
@@ -1185,6 +1200,16 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     }
   }
 
+  def foreachRow(block: (Vector[T],Int) => Unit) {
+    for (i <- 0 until numRows){
+      block(getRow(i), i)
+    }
+  }
+
+  def initRow(idx: Int) {
+    throw new RuntimeException("initRow : This operation should be overriden")
+  }
+
   /*
   def reduce(func: (Vector[T],Vector[T]) => Vector[T]): Vector[T] = {
     val v = Vector[Vector[T]](numRows)
@@ -1294,6 +1319,9 @@ trait Matrix[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     throw new RuntimeException("cutoffAndReturn: This operation should be overridden")
   }
 
+  def dist(i:Int, j:Int): T = {
+    throw new UnsupportedOperationException("dist of Matrix[T]")
+  }
 
   //////////////////
   // error handlers

@@ -674,7 +674,21 @@ object FloatVector {
   }
   */
 
-  
+  protected[optiml] case class OP_sort(val coll: FloatVector)
+    extends DeliteOP_SingleTask[Vector[Float]](coll) {
+
+    def task = {
+      // in scala.util.Sorting.quickSort, coll._data.length is used
+      if(coll._length != coll._data.length){
+        val d = new Array[Float](coll._length)
+        Array.copy(coll._data, 0, d, 0, coll._length)
+        coll._data = d
+      }
+      scala.util.Sorting.quickSort(coll._data)
+      coll
+    }
+
+  }
 
 }
 
@@ -851,5 +865,9 @@ trait FloatVector extends Vector[Float] {
     else
       run(OP_REPMAT(this, i, j))
   }
-  
+
+  override def sort(implicit cmp: Float => Ordered[Float], pfact: DeliteProxyFactory[Vector[Float]]) : Vector[Float] = {
+    run(OP_sort(this))(pfact)
+  }
+
 }

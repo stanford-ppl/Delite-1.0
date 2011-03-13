@@ -282,6 +282,20 @@ private[optiml] class DoubleMatrixImpl extends DoubleMatrix with GPUable[Double]
     run(OP_removeCols(this,pos,num))(doubleMatFactory)
   }
 
+  override def dist(i:Int, j:Int): Double = {
+    var sum:Double = 0
+    var offset_i = i*_numCols
+    var offset_j = j*_numCols
+    val end = offset_i + _numCols
+    while(offset_i < end){
+      val tmp = _data(offset_i) - _data(offset_j)
+      sum += java.lang.Double.longBitsToDouble((java.lang.Double.doubleToRawLongBits(tmp)<<1)>>>1)
+      offset_i += 1
+      offset_j += 1
+    }
+    sum
+  }
+
   protected def ensureExtra(extra: Int) {
     chkUpdate
     if (_data.length - size < extra) {

@@ -26,11 +26,12 @@ object Vector {
   ///////////////////////
   // user visible methods
 
-  // weirdly, because of the signature Vector.apply(len: Int), apply(xs: A*) won't match if A is Int
-  def apply[A : ClassManifest](len: Int) : Vector[A] = newVector[A](len)
-  def apply[A : ClassManifest](xs: A*) : Vector[A] = newVectorFromSeq(xs)
-  def apply[A : ClassManifest](is_row: Boolean, len: Int) : Vector[A] = newVector[A](len, is_row)
-  def apply[A : ClassManifest](is_row: Boolean, xs: A*) : Vector[A] = newVectorFromSeq(xs, is_row)
+    // weirdly, because of the signature Vector.apply(len: Int), apply(xs: A*) won't match if A is Int
+    def apply[A : ClassManifest](len: Int) : Vector[A] = newVector[A](len)
+    def apply[A : ClassManifest](xs: A*) : Vector[A] = newVectorFromSeq(xs)
+    def apply[A : ClassManifest](is_row: Boolean, len: Int) : Vector[A] = newVector[A](len, is_row)
+    def apply[A : ClassManifest](is_row: Boolean, xs: A*) : Vector[A] = newVectorFromSeq(xs, is_row)
+    def apply[A : ClassManifest](xs: Array[A]) : Vector[A] = newVectorFromArray(xs)
 
   // special apply method for GPU use (Generate Impl with given array and given length 
   def apply[A : ClassManifest](xs: Array[A], is_row: Boolean, len: Int) : Vector[A] = newVector[A](xs, len, is_row)
@@ -143,14 +144,18 @@ object Vector {
     }
   }
 
-  private def newVectorFromSeq[A](data: Seq[A], is_row: Boolean = true, frozen: Boolean = false)(implicit m: ClassManifest[A]): Vector[A] = {
-    val v = newVector[A](data.length, is_row)
-    for (i <- 0 until data.length){
-      v(i) = data(i)
+    private def newVectorFromSeq[A](data: Seq[A], is_row: Boolean = true, frozen: Boolean = false)(implicit m: ClassManifest[A]): Vector[A] = {
+      val v = newVector[A](data.length, is_row)
+      for (i <- 0 until data.length){
+        v(i) = data(i)
+      }
+      if (frozen) v.freeze
+      v
     }
-    if (frozen) v.freeze
-    v
-  }
+
+    private def newVectorFromArray[A](data: Array[A], is_row: Boolean = true):Vector[A] = {
+      throw new UnsupportedOperationException("newVectorFromArray is not supported by all Vector types")
+    }
 
   private def newVectorFromFunction[A : ClassManifest](func: Int => A)(len: Int): Vector[A] = {
     range(0, len).map(i => func(i))
@@ -483,18 +488,20 @@ object Vector {
     // this would be a slow lookup
     //implicit def conv : A => DeliteInt = e => coll.asInstanceOf[Vector[A]].indexOf(e)
 
-    def task = {
-      var smallest = v(0)
-      var min_i = 0
-      for (i <- 1 until v.length){
+      def task = {
+        var smallest = v(0)
+        var min_i = 0
+        var i = 0
+        while (i < v.length){
           if (v(i) < smallest){
-            smallest = v(i)
-            min_i = i
+              smallest = v(i)
+              min_i = i
+          }
+          i += 1
         }
+        DeliteInt(min_i)
       }
-      DeliteInt(min_i)
     }
-  }
 
   protected[optiml] case class OP_median[A,B <: DeliteDSLType](val coll: Vector[A])
     (implicit ops: ArithOps[A], cmp: A => Ordered[A], conv: A => B, pFact: DeliteProxyFactory[B], vecPfact: DeliteProxyFactory[Vector[A]])
@@ -533,23 +540,26 @@ object Vector {
   protected[optiml] case class OP_sort[A](val coll: Vector[A])
     (implicit cmp: A => Ordered[A]) extends DeliteOP_SingleTask[Vector[A]](coll) {
 
-    //def task = throw new UnsupportedOperationException()
-    // TODO: below is a really naive implementation of sort, replace it with quick-sort from scala/java api
-    println("warning: calling Vector.sort (slow!!!)")
-    def task = {
-      val res = coll.clone
-      for(i <- 0 until coll.length) {
-        for(j <- i+1 until coll.length) {
-          if(res(i) < res(j)) {
-            val temp = res(i)
-            res(i) = res(j)
-            res(j) = temp
+      def task = throw new UnsupportedOperationException()
+
+/*
+      // TODO: below is a naive implementation of sort, replace it with quick-sort from scala api
+      println("warning: calling Vector.sort (slow!!!)")
+      def task = {
+        val res = coll
+        for(i <- 0 until coll.length) {
+          for(j <- i+1 until coll.length) {
+            if(res(i) > res(j)) {
+              val temp = res(i)
+              res(i) = res(j)
+              res(j) = temp
+            }
           }
         }
+        res
       }
-      res
+*/
     }
-  }
 
   /**
    * bulk ops
@@ -755,6 +765,20 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
   /* Checks popsicle immutability */
   def frozen: Boolean
 
+  /* (For streaming matrix use) Store the reference of the matrix it came from */
+  def matrix: Matrix[T]  = {
+    throw new UnsupportedOperationException("matrix is not supported by all Vector[T]")
+  }
+
+  /* (For streaming matrix use) */
+  def index: Int = {
+    throw new UnsupportedOperationException("index is not supported by all Vector[T]")
+  }
+
+  def index_= (i:Int){
+    throw new UnsupportedOperationException("index_= is not supported by all Vector[T]")
+  }
+
   /////////////////////////
   // for internal use only
   // UNSAFE! Will throw a NPE if used on a proxy -- USE WITH CAUTION
@@ -764,6 +788,9 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
   /*protected*/ def _is_row_=(b: Boolean) : Unit
   protected def _frozen: Boolean
   protected def _frozen_=(b: Boolean) : Unit
+  def data : Array[T] = {
+    throw new UnsupportedOperationException("data is not supported by all Vector[T]")
+  }
 
   ///////////////
   // conversions
@@ -904,6 +931,16 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
   def :=(n: Int, x: T) = lifted_update(n, x)
   def lifted_update(n: Int, x: T)
   def update(n: Int, x: T)
+
+  def updatev(v: Vector[Int], x: T) = {
+    val len = v.length
+    var i = 0
+    while(i < len){
+      update(v(i), x)
+      i += 1
+    }
+  }
+
 
   def ++[A <: T](xs: Vector[A])(implicit m : ClassManifest[T]) : Vector[T] = {
     val buf = Vector[T](is_row, 0)
@@ -1099,8 +1136,11 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
   }
 
   def foreach(block: T => Unit) = {
-    for (i <- 0 until length){
+    var i = 0
+    val _length = length
+    while(i < _length){
       block(this(i))
+      i += 1
     }
   }
 
@@ -1164,7 +1204,7 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     result
   }
   
-  def partition(pred: T => Boolean)(implicit m : ClassManifest[T]): (Vector[T],Vector[T]) = {
+  def stable_partition(pred: T => Boolean)(implicit m : ClassManifest[T]): (Vector[T],Vector[T]) = {
     val resultT = Vector[T](0)
     val resultF = Vector[T](0)
     var i = 0
@@ -1291,5 +1331,17 @@ trait Vector[@specialized(Double,Float,Int) T] extends DeliteCollection[T] with 
     if (index < 0 || index > length) throw new IndexOutOfBoundsException
     index
   }
+
+  def find(pred:T => Boolean):Vector[Int] = {
+    val len = length
+    var out = Vector[Int](0)
+    var i = 0
+    while(i < len){
+      if(pred(this.apply(i))) out += i
+      i += 1
+    }
+    out
+  }
+
 
 }

@@ -21,6 +21,7 @@ import ppl.delite.dsl.optiml.io.MLInputReader
 import ppl.delite.dsl.optiml.exception._
 import ppl.delite.dsl.optiml.train.{Labels, TrainingSet}
 import collection.mutable.{HashSet, ArrayBuffer, Cloneable}
+import specialized.{DoubleVectorImpl, DoubleMatrixImpl}
 
 object appinclude {
 
@@ -194,7 +195,7 @@ object appinclude {
       if (vals(i) < min){
         min = vals(i)
        }
-      i = i+1
+      i = i + 1
     }
 
     min
@@ -215,6 +216,7 @@ object appinclude {
       if (vals(i) > max){
         max = vals(i)
       }
+      i = i + 1
     }
 
     max
@@ -570,6 +572,33 @@ object appinclude {
     if (sampleRows) sampled else sampled.trans
   }
 
+  // sampling of input to reduce data size
+  def sample[A : ClassManifest](v: Vector[A], numSamples: Int, method: String) : Vector[A] = {
+    method match {
+      case "random" => randsample(v, numSamples)
+      case _ => throw new UnsupportedOperationException("unknown sampling type selected")
+    }
+  }
+  //def sample[A](v: Vector[A]) : Vector[A]
+
+  def randsample[A : ClassManifest](v: Vector[A], numSamples: Int) : Vector[A] = {
+    val candidates = Vector.mrange(0, numSamples)
+
+    var sampled = Vector[A](0)
+    for (i <- 0 until numSamples){
+      val r = i + randomInt(numSamples - i)
+      val idx = candidates(r)
+      sampled += v(idx)
+
+      // remove index r from consideration
+      val t = candidates(r)
+      candidates(r) = candidates(i)
+      candidates(i) = t
+    }
+
+    sampled
+  }
+
   // interpolation of input to increase data size
   //def interpolate[A](m: Matrix[A]) : Matrix[A]
   //def interpolate[A](v: Vector[A]) : Vector[A]
@@ -583,6 +612,59 @@ object appinclude {
       case "euc" => eucdist(v1, v2)
       case _ => throw new UnsupportedOperationException("unknown dist metric selected")
     }
+  }
+
+  def dist(m1:Matrix[Double], i:Int, m2:Matrix[Double], j:Int) : Double = {
+    // TODO: need to check if m1 & m2 are StreamingDoubleMatrixImpl
+    // TODO: check m1.numCols == m2.numCols
+    val _data1 = m1.asInstanceOf[DoubleMatrixImpl]._data
+    val _data2 = m2.asInstanceOf[DoubleMatrixImpl]._data
+    var sum:Double = 0
+    var offset_i = i*m1._numCols
+    var offset_j = j*m2._numCols
+    val end = offset_i + m1._numCols
+    while(offset_i < end){
+      val tmp = _data1(offset_i) - _data2(offset_j)
+      sum += java.lang.Double.longBitsToDouble((java.lang.Double.doubleToRawLongBits(tmp)<<1)>>>1)
+      offset_i += 1
+      offset_j += 1
+    }
+    sum
+  }
+
+  def dist(v:Vector[Double], m:Matrix[Double]):Vector[Double] ={
+    // TODO: check if m is StreamingDoubleMatrix
+    // TODO: check v1.length == m.numCols
+    val _data = m.asInstanceOf[DoubleMatrixImpl]._data
+    val numRows = m._numRows
+    val numCols = m._numCols
+    var res = Vector[Double](numRows)
+    var r = 0
+    while(r < numRows){
+      var offset_i = 0
+      var offset_j = r*numCols
+      var sum:Double = 0
+      while(offset_i < numCols){
+        val tmp = v(offset_i) - _data(offset_j)
+        sum += java.lang.Double.longBitsToDouble((java.lang.Double.doubleToRawLongBits(tmp)<<1)>>>1)
+        offset_i += 1
+        offset_j += 1
+      }
+      res(r) = sum
+      r += 1
+    }
+    res
+  }
+
+  def dist(_data1:Array[Double], _data2:Array[Double], numCols:Int):Double = {
+    var sum:Double = 0
+    var i = 0
+    while(i < numCols){
+      val tmp = _data1(i) - _data2(i)
+      sum += java.lang.Double.longBitsToDouble((java.lang.Double.doubleToRawLongBits(tmp)<<1)>>>1)
+      i+= 1
+    }
+    sum
   }
 
   def distm(m1: Matrix[Double], m2: Matrix[Double], metric: String = "abs") : Matrix[Double] = {
@@ -600,7 +682,24 @@ object appinclude {
     out
   }
 
-  def absdist(v1: Vector[Double], v2: Vector[Double]) : Double = (v1-v2).abs.sum[DeliteDouble]
+  //def absdist(v1: Vector[Double], v2: Vector[Double]) : Double = (v1-v2).abs.sum[DeliteDouble]
+
+  def absdist(v1: Vector[Double], v2: Vector[Double]) : Double = {
+    // val _data1 = v1.asInstanceOf[DoubleVectorImpl]._data
+    // val _data2 = v2.asInstanceOf[DoubleVectorImpl]._data
+    val _data1 = v1.data
+    val _data2 = v2.data
+    var sum:Double = 0
+    val length = v1.length
+    var idx = 0
+    while(idx < length){
+      val tmp = _data1(idx) - _data2(idx)
+      sum += java.lang.Double.longBitsToDouble((java.lang.Double.doubleToRawLongBits(tmp)<<1)>>>1)
+      idx += 1
+    }
+    sum
+  }
+
   def eucdist(v1: Vector[Double], v2: Vector[Double]) : Double = Math.sqrt((v1-v2).map(e => Math.pow(e, 2)).sum[DeliteDouble])
 
   /**
@@ -619,4 +718,26 @@ object appinclude {
     val minIdx = dists.minIndex
     if (v.is_row) mt(minIdx) else mt(minIdx).trans
   }
+
+  def nearest_neighbor(i: Int, m: Matrix[Double]) : Int = {
+    val dists = (0::m.numRows){j =>
+      val d = m.dist(i,j)
+      if (d == 0.0) Math.MAX_DOUBLE else d
+    }
+    val minIdx = dists.minIndex
+    minIdx
+  }
+  
+  def updateIf[A,B] (pred: => Boolean)(f: A => B){
+    if(pred) f
+  }
+
+  def get_data(m:Matrix[Double]) ={
+    m.asInstanceOf[DoubleMatrixImpl]._data
+  }
+
+  def get_data(v:Vector[Double]) ={
+    v.asInstanceOf[DoubleVectorImpl]._data
+  }
+  
 }

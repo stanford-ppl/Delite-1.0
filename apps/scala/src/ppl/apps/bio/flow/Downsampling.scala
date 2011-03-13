@@ -14,6 +14,8 @@ import ppl.delite.dsl.optiml._
 import io.{MLOutputWriter, MLInputReader}
 import ppl.delite.dsl.optiml.appinclude._
 import ppl.delite.core.appinclude._
+import ppl.delite.metrics.PerformanceTimer
+import specialized.{DoubleMatrix, StreamingDoubleMatrixImpl}
 import train.TrainingSet
 import ppl.delite.core.{DeliteApplication, Delite}
 import ppl.delite.dsl.primitive.{DeliteInt, DeliteDouble}
@@ -24,40 +26,7 @@ object Downsampling{
                             used_markers: Vector[Int], is_normalize: Boolean, normalize_weight_factor: Double)
                             : Vector[Int] = {
 
-//    val data = TrainingSet( MLInputReader.read(filename) )
-
-    val input = Matrix[Double](10,3)
-    input(0,0) = 0
-    input(0,1) = 1
-    input(0,2) = 2
-    input(1,0) = 3
-    input(1,1) = 4
-    input(1,2) = 5
-    input(2,0) = 6
-    input(2,1) = 7
-    input(2,2) = 8
-    input(3,0) = 9
-    input(3,1) = 10
-    input(3,2) = 11
-    input(4,0) = 12
-    input(4,1) = 13
-    input(4,2) = 14
-    input(5,0) = 15
-    input(5,1) = 16
-    input(5,2) = 17
-    input(6,0) = 18
-    input(6,1) = 19
-    input(6,2) = 20
-    input(7,0) = 21
-    input(7,1) = 22
-    input(7,2) = 23
-    input(8,0) = 24
-    input(8,1) = 25
-    input(8,2) = 26
-    input(9,0) = 27
-    input(9,1) = 28
-    input(9,2) = 29
-    val data = TrainingSet(input)
+    val data = TrainingSet( MLInputReader.read(filename) )
 
     println("   Input matrix size: " + data.numRows + "*" + data.numCols)
 
@@ -67,14 +36,21 @@ object Downsampling{
     val numSamples = min(data.numRows, 2000, Math.floor(2500000000l/data.numRows)).intValue
     println("   numSamples = " + numSamples)
 
+    PerformanceTimer.start("compute_median_min_dist")
     val med_min_dist = compute_median_min_dist(data, numSamples)
+    PerformanceTimer.stop("compute_median_min_dist")
     println("   med_min_dist = " + med_min_dist)
 
     val kernel_width = downsampling_scaling_factor * med_min_dist
     val apprx_width  = 1.5 * med_min_dist
     println("   For this " + data.numRows + " channel data, KERNEL WIDTH is " + kernel_width + ", APPRX WIDTH is " + apprx_width)
 
+    PerformanceTimer.start("count_neighbors")
     val densities = count_neighbors(data, kernel_width, apprx_width)
+    PerformanceTimer.stop("count_neighbors")
+
+    PerformanceTimer.print("compute_median_min_dist")
+    PerformanceTimer.print("count_neighbors")
 
     densities
   }
@@ -85,180 +61,239 @@ object Downsampling{
     // 2 inefficiencies here:
     //   1) should push sampling into the parallel loop
     //   2) calculating the nearest neighbor implies calculating its distance, so doing it again is redundant
-    
+
     // sampled_data is numSamples x data.numCols
-    val sampled_data = sample(data, numSamples)
+    val index = Vector.mrange(0, data.numRows)
+    val sampled_index = sample(index, numSamples, "random")
 
     val min_dist = (0::numSamples) { i =>
-      val sample = sampled_data(i)
-      val neighbor = nearest_neighbor(sample, data)
-      val d = dist(sample, neighbor)
+      val sample_idx = sampled_index(i)
+      val neighbor_idx = nearest_neighbor(sample_idx, data)
+      val d = data.dist(sample_idx, neighbor_idx)
       d
     }
 
-    min_dist.median
+    val median = min_dist.median
+
+    median
   }
 
   def count_neighbors(data: TrainingSet[Double], kernel_width: Double, apprx_width: Double) : Vector[Int] = {
 
     println("   finding local density for each cell ...")
-/*
-    val distances = distm(data, data)
-    val distances_in_range = distances map (x => if (x < kernel_width) 1 else 0)
-    val densities_true = distances_in_range.mapRowsToVec( row => row.sum[DeliteInt].value )
-    val neighbors = distances map (x => if (x < apprx_width) true else false)
-    var densities = Vector[Int](data.numRows)
-*/
-/*
-    /**
-    *  TODO functional sequential, no race
-    */
-    val indices = (0::densities_true.length)
 
-    // this is a list of indices (lists) that each element of the density vector would set with no conflicts
-    val indicesInOrderOfUpdate = indices.map( i => indices.filter(neighbors(i,_)))
-    println("\nindicesInOrderOfUpdate = ")
-    for (i <- 0 until indicesInOrderOfUpdate.length){
-      indicesInOrderOfUpdate(i).pprint
-    }
+    val distances = Matrix[Double](data.numRows, data.numRows, (i,j)=> data.dist(i,j))
 
-    val indicesDeduplicated = setzeros(indicesInOrderOfUpdate)
-    println("\nindicesDeduplicated = ")
-    for (i <- 0 until indicesDeduplicated.length){
-      indicesDeduplicated(i).pprint
+    //TODO streaming version (fastest streaming version)
+    val densities = Vector[Int](data.numRows)
+    distances.foreachRow { (row, idx) =>
+      if(idx%1000 == 0) println("  (streaming) # processed node = " + idx)
+      if(densities(idx) == 0) {
+        val distances_in_range = row map (e=> if (e < kernel_width) 1 else 0)  // find neighbors in range
+        val c = distances_in_range.sum[DeliteInt]    // count # of neighbors
+        val neighbors = row find (_ < apprx_width)   // find approx neighbors
+        densities.updatev(neighbors,c)               // approximately update
+      }
     }
     
-    // generate a cumulative list of the indices updated from left to right
-    val indicesCumulativeUpdated = indices map ( i => (Vector.flatten(indicesDeduplicated.slice(0,i))).distinct )
-    println("\nindicesCumulativeUpdated = ")
-    for (i <- 0 until indicesCumulativeUpdated.length){
-      indicesCumulativeUpdated(i).pprint
-    }
-    
-    // filter the original list to leave only unique updates
-    // e.g. uniqueUpdates = { (0,1), (), (2,3), (), (4,5), (), (6,7), (), (8,9) }
-    val uniqueUpdates = indices.map( i => indicesDeduplicated(i).filter(!indicesCumulativeUpdated(i).contains(_)))
-    println("\nuniqueUpdates = ")
-    for (i <- 0 until uniqueUpdates.length){
-      uniqueUpdates(i).pprint
-    }
-
-    // retrieve the final densities result, guaranteed to be disjoint due to uniqueness (but not known statically..)
-    // indices.foreach { i => densities(uniqueUpdates(i)) = densities_true(i)}
-    indices.foreach { i => uniqueUpdates(i).foreach { j => densities(j) = densities_true(i) }}
-
-    println("\ndensities = ")
-    densities.pprint
-*/
 /*
-    /**
-    * TODO imperative sequential, no race
-    */
-    for (i <- 0 until densities.length) {
-      if (densities(i) == 0) {
-        val indices = (0::densities.length).filter(neighbors(i,_))
-        // out_densities(indices) = in_densities(i)
-        // the above is shorthand for:
-        for (j <- 0 until indices.length) {
-          if(densities(indices(j))==0)
-            densities(indices(j)) = densities_true(i)
-        }
+    //TODO streaming row version (using find)
+    val densities = Vector[Int](data.numRows)
+    distances.foreachRow { row =>
+      if(row.index%1000 == 0) println("  (streaming row find) # processed node = " + row.index)
+      if(densities(row.index) == 0) {
+        val neighbors = row find (_ < kernel_width)
+        val apprxs = row find (_ < apprx_width)
+        densities.updatev(apprxs,neighbors.length)
       }
     }
 */
 /*
-    /**
-    * TODO parallel, intentional race
-    */
-    (0::densities.length).mforeach {i =>
-      if (densities(i) == 0) { // race!
-        val indices = (0::densities.length).filter(neighbors(i,_))
-        // out_densities(indices) = in_densities(_)
-        // the above is shorthand for:
-        for (j <- 0 until indices.length) {
-          if(densities(indices(j))==0)
-            densities(indices(j)) = densities_true(i)
-        }
+    //TODO streaming row version (using row.idx, slow because of force)
+    val densities = Vector[Int](data.numRows)
+    distances.foreachRow { row =>
+      if(row.index%1000 == 0) println("  (streaming row) # processed node = " + row.index)
+      if(densities(row.index) == 0) {
+        val distances_in_range = row map (e=> if (e < kernel_width) 1 else 0)  // find neighbors in range
+        val c = distances_in_range.sum[DeliteInt]    // count # of neighbors
+        val neighbors = row find (_ < apprx_width)   // find approx neighbors
+        densities.updatev(neighbors,c)               // approximately update
       }
-    }().force
+    }
 */
 /*
-    /**
-    * TODO sequential, no race, using flag
-    */
-    
-    val distances = distm(data, data)
-    val distances_in_range = distances filter (_ < kernel_width)
-    var densities = distances_in_range.map(x => if (x == true) 1 else 0).mapRowsToVec( row => row.sum[DeliteInt].value )
-    val neighbors = distances filter (_ < apprx_width)
-
-    val flag = Vector[Boolean](neighbors.numRows).map(e => true)
-    val out = densities.clone
-    for(i <- 0 until neighbors.numRows){
-      if(flag(i))
-        for(j <- 0 until neighbors.numCols){
-          if(neighbors(i,j)){
-            if(flag(j)) out(j) = densities(i)
-            flag(j) = false
+    //TODO fused streaming version (using nRow and Array) (fastest fused version)
+    val nRows = data.numRows
+    val densities = Vector[Int](nRows)
+    distances.foreachRow { (row, idx) =>
+      if(idx%1000 == 0) println("  (streaming fusing - nRows, Array) # processed node = " + idx)
+      if(densities(idx) == 0) {
+        var c = 0
+        var j = 0
+        var neighbors = new Array[Int](nRows)
+        var neighbor_id = 0
+        while(j < nRows){
+          val e = data.dist(idx, j)
+          val r = if (e < kernel_width) 1 else 0
+          c += r
+          if(e < apprx_width){
+            neighbors(neighbor_id) = j
+            neighbor_id += 1
           }
+          j += 1
         }
+        while(neighbor_id > 0){
+          neighbor_id -= 1
+          densities(neighbors(neighbor_id)) = c
+        }
+      }
     }
-    densities = out
+*/
+/*
+    //TODO fused streaming version (using row.length and Vector)
+    val densities = Vector[Int](data.numRows)
+    distances.foreachRow { (row, idx) =>
+      if(idx%1000 == 0) println("  (streaming fusing - row.length, Vector) # processed node = " + idx)
+      if(densities(idx) == 0) {
+        var c = 0
+        var j = 0
+        var neighbors = Vector[Int](0)
+        while(j < row.length){
+          val e = data.dist(idx, j)
+          val r = if (e < kernel_width) 1 else 0
+          c += r
+          if (e < apprx_width)  neighbors += j
+          j += 1
+        }
+        densities.updatev(neighbors,c)
+     }
+    }
+*/
+/*
+    //TODO fused streaming version (using nRows and Vector)
+    val nRows = data.numRows
+    val densities = Vector[Int](nRows)
+    distances.foreachRow { (row, idx) =>
+      if(idx%1000 == 0) println("  (streaming fusing - nRows, Vector) # processed node = " + idx)
+      if(densities(idx) == 0) {
+        var c = 0
+        var j = 0
+        var neighbors = Vector[Int](0)
+        while(j < nRows){
+          val e = data.dist(idx, j)
+          val r = if (e < kernel_width) 1 else 0
+          c += r
+          if (e < apprx_width)  neighbors += j
+          j += 1
+        }
+        densities.updatev(neighbors,c)
+     }
+    }
+*/
+/*
+    //TODO fused streaming version (using nRows, Array and row.index)
+    val nRows = data.numRows
+    val densities = Vector[Int](nRows)
+    distances.foreachRow { row =>
+      if(row.index%1000 == 0) println("  (streaming fusing - nRows, Array, row.index) # processed node = " + row.index)
+      if(densities(row.index) == 0) {
+        var c = 0
+        var j = 0
+        var neighbors = new Array[Int](nRows)
+        var neighbor_id = 0
+        while(j < nRows){
+          val e = data.dist(row.index, j)
+          val r = if (e < kernel_width) 1 else 0
+          c += r
+          if(e < apprx_width){
+            neighbors(neighbor_id) = j
+            neighbor_id += 1
+          }
+          j += 1
+        }
+        while(neighbor_id > 0){
+          neighbor_id -= 1
+          densities(neighbors(neighbor_id)) = c
+        }
+      }
+    }
+*/
+/*
+    //TODO fused streaming version (using data.numRows, Array)
+    val densities = Vector[Int](data.numRows)
+    distances.foreachRow { (row, idx) =>
+      if(idx%1000 == 0) println("  (streaming fusing - data.numRows, Array) # processed node = " + idx)
+      if(densities(idx) == 0) {
+        var c = 0
+        var j = 0
+        var neighbors = new Array[Int](data.numRows)
+        var neighbor_id = 0
+        while(j < data.numRows){
+          val e = data.dist(idx, j)
+          val r = if (e < kernel_width) 1 else 0
+          c += r
+          if(e < apprx_width){
+            neighbors(neighbor_id) = j
+            neighbor_id += 1
+          }
+          j += 1
+        }
+        while(neighbor_id > 0){
+          neighbor_id -= 1
+          densities(neighbors(neighbor_id)) = c
+        }
+      }
+    }
 */
 
-    //TODO version 1: parallel outer loop, w/o approximation
-    var densities = Vector[Int](data.numRows)
-    (0::data.numRows).mforeach { i =>
-      if(i%100 == 0) println("   # processed node = " + i)
-
-      val c = sumd(0, data.numRows){ j =>
-        val d = dist(data(i), data(j))
-        if (d < kernel_width) 1 else 0
-      }
-      densities(i) = c.asInstanceOf[Int]
-    }().force
-
 /*
-    //TODO version 2: parallel outer loop, w/ approximation
-    var densities = Vector[Int](data.numRows)
-    (0::data.numRows).mforeach { i =>
-      if(i%100 == 0) println("   # processed node = " + i)
-
+    //TODO buffered version (deprecated)
+    val densities = Vector[Int](data.numRows)
+    (0::data.numRows).mforeach { idx =>
+      if(idx%1000 == 0) println("  (buffered) # processed node = " + idx)
+      if(densities(idx) == 0) {
+        val row = distances(idx)
+        val distances_in_range = row map (e=> if (e < kernel_width) 1 else 0)
+        val c = distances_in_range.sum[DeliteInt]
+        val neighbors = row find (_ < apprx_width)
+        // densities(neighbors) = c
+        densities.updatev(neighbors,c)
+      }
+    }().force
+*/
+/*
+    //TODO imperative version 1: parallel outer loop, w/ approximation (fastest imperative version)
+    val nRows = data.numRows
+    var densities = Vector[Int](nRows)
+    (0::nRows).mforeach { i =>
+      if(i%1000 == 0) println("  (imperative 1) # processed node = " + i)
       if(densities(i) <= 0) {
         var c = 0
-        val dist_i = (0::data.numRows) { j =>
-          val d = dist(data(i), data(j))
+        var j = 0
+        val apprxs = new Array[Int](nRows)
+        var appr_idx = 0
+        while( j < nRows) {
+          val d = data.dist(i, j)
           if(d < kernel_width) c = c + 1
-          d
+          if(d < apprx_width) {
+            apprxs(appr_idx) = j
+            appr_idx += 1
+          }
+          j += 1
         }
-        (0::data.numRows){ j=>
-          if (dist_i(j) < apprx_width && densities(j) <= 0)
-            densities(j) = c
+        while( appr_idx > 0){
+          appr_idx -= 1
+          val neighbor = apprxs(appr_idx)
+          if(densities(neighbor)==0) densities(neighbor) = c
         }
-      }
-      else {
-        densities(i)
       }
     }().force
 */
 /*
-    //TODO version 3: sequential outer loop, w/o approximation
+    //TODO imperative version 2: sequential outer loop, w/ approximation
     var densities = Vector[Int](data.numRows)
     for (i <- 0 until data.numRows) {
-      if(i%100 == 0) println("   # processed node = " + i)
-
-      val c = sumd(0, data.numRows){ j =>
-        val d = dist(data(i), data(j))
-        if (d < kernel_width) 1 else 0
-      }
-      densities(i) = c.asInstanceOf[Int]
-    }
-*/
-/*
-    //TODO version 4: sequential outer loop, w/ approximation
-    var densities = Vector[Int](data.numRows)
-    for (i <- 0 until data.numRows) {
-      if(i%100 == 0) println("   # processed node = " + i)
+      if(i%100 == 0) println("   (imperative 2) # processed node = " + i)
 
       if(densities(i) <= 0){
         val c = sumd(0, data.numRows){ j =>
@@ -282,18 +317,5 @@ object Downsampling{
     densities
   }
 
-  def setzeros(vv: Vector[Vector[Int]]): Vector[Vector[Int]] = {
-    val out = Vector[Vector[Int]](vv.length)
-    for(i <- 0 until vv.length)
-      out(i) = vv(i).clone
-    for(i <- 0 until vv.length)
-      for(j <- 0 until out(i).length)
-        if(out(i)(j) > i){
-          // println("[" + i + "] set out(" + out(i)(j) + ") = null")
-          out(out(i)(j)) = Vector[Int](0)
-        }
-    out
-  }
-  
 }
 
