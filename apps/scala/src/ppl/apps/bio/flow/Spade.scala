@@ -5,10 +5,12 @@ import ppl.delite.dsl.optiml.{Matrix, Vector}
 import ppl.delite.core.appinclude._
 import ppl.delite.dsl.primitive.DeliteInt
 
+/*
 import org.rosuda.JRI.Rengine
 import org.rosuda.JRI.REXP
 import org.rosuda.JRI.RMainLoopCallbacks
 import org.rosuda.JRI.RConsoleOutputStream
+*/
 import ppl.delite.dsl.optiml.io.{MLInputReader, MLOutputWriter}
 import ppl.delite.dsl.optiml.train.TrainingSet
 import ppl.delite.metrics.PerformanceTimer
