@@ -17,7 +17,7 @@ import ppl.delite.metrics.PerformanceTimer
 
 object Spade extends DeliteApplication {
   def print_usage = {
-    println("Usage: Downsampling <input data file> <output data file>")
+    println("Usage: Spade <input data file> <output data file>")
     exit(-1)
   }
 
